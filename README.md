@@ -1,6 +1,6 @@
-# 基于 Makefile 的 SysY 编译器项目模板
+# 基于 Makefile 的 SysY 编译器项目
 
-该仓库中存放了一个基于 Makefile 的 SysY 编译器项目的模板, 你可以在该模板的基础上进行进一步的开发.
+该项目为2022年春季学期《编译原理》课程期末大作业，从[模板仓库](https://github.com/pku-minic/sysy-make-template.git)获取，该仓库中存放了一个基于 Makefile 的 SysY 编译器项目的模板, 可以根据[项目指导文档](https://pku-minic.github.io/online-doc/#/)在该模板的基础上进行进一步的开发.
 
 该仓库中的 C/C++ 代码实现仅作为演示, 不代表你的编译器必须以此方式实现. 如你需要使用该模板, 建议你删掉所有 C/C++ 源文件, 仅保留 `Makefile` 和必要的目录结构, 然后重新开始实现.
 
