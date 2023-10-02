@@ -1,8 +1,11 @@
+#pragma once
 #include <cassert>
 #include <cstdio>
 #include <iostream>
+#include <cstdlib>
 #include <memory>
 #include <string>
+// #include "rawp.cpp"
 #include "ast.hpp"
 
 using namespace std;
@@ -15,6 +18,9 @@ using namespace std;
 extern FILE *yyin;
 extern FILE *yyout;
 extern int yyparse(unique_ptr<BaseAST> &ast);
+extern void solve_koopa(char *str);
+
+int cnt_block, ret_value;
 
 int main(int argc, const char *argv[]) {
     // 解析命令行参数. 测试脚本/评测平台要求你的编译器能接收如下参数:
@@ -37,9 +43,19 @@ int main(int argc, const char *argv[]) {
     auto ret = yyparse(ast);
     assert(!ret);
 
+    char *str = (char *)malloc(10000 * sizeof(char));
+
     // 输出解析得到的 AST, 其实就是个字符串
-    ast->Dump();
-    cout << endl;
+    ast->Dump(str, cnt_block, ret_value);
+    if (mode[1] == 'k'){
+        cout << str << endl;
+    } else if (mode[1] == 'r'){
+        solve_koopa(str);
+    } else {
+        cerr << "Unknown Parameters!" << endl;
+    }
+
+    free(str);
 
     fclose(stdin);
     fclose(stdout);

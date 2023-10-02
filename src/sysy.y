@@ -44,6 +44,12 @@ using namespace std;
 
 // 非终结符的类型定义
 %type <ast_val> FuncDef FuncType Block Stmt
+%type <ast_val> Exp PrimaryExp UnaryExp
+// %type <ast_val> MulExp AddExp
+// %type <ast_val> RelExp EqExp LandExp LorExp
+// %type <ast_val> Decl ConstDecl BType ConstDef ConstInitVal ConstExp
+// %type <ast_val> VarDecl VarDef InitVal
+// %type <ast_val> LVal BlockItem FuncFParams FuncFParam
 %type <int_val> Number
 
 %%
@@ -99,11 +105,36 @@ Block
   }
   ;
 
-// Stmt ::= "return" Number ";";
+// Stmt ::= "return" Exp ";";
 Stmt
-  : RETURN Number ';' {
+  : RETURN Exp ';' {
     auto ast = new StmtAST();
-    ast->number = $2;
+    ast->exp = unique_ptr<BaseAST>($2);
+    $$ = ast;
+  }
+  ;
+
+// Exp ::= AddExp;
+Exp
+  : UnaryExp {
+    auto ast = new ExpAST();
+    ast->unary_exp = unique_ptr<BaseAST>($1);
+    $$ = ast;
+  }
+  ;
+
+// PrimaryExp ::= "(" Exp ")" | Number;
+PrimaryExp
+  : '(' Exp ')' {
+    auto ast = new PrimaryExpAST();
+    ast->exp = unique_ptr<BaseAST>($2);
+    ast->mode = 1;
+    $$ = ast;
+  }
+  | Number {
+    auto ast = new PrimaryExpAST();
+    ast->number = $1;
+    ast->mode = 2;
     $$ = ast;
   }
   ;
@@ -111,9 +142,39 @@ Stmt
 // Number ::= INT_CONST;
 Number
   : INT_CONST {
-    auto ast = new NumberAST();
-    ast->num = $1;
-    $$ = ast->num;
+    int num = $1;
+    $$ = num;
+  }
+  ;
+
+// UnaryExp ::= PrimaryExp | ("+" | "-" | "!") UnaryExp;
+UnaryExp
+  : PrimaryExp {
+    auto ast = new UnaryExpAST();
+    ast->primary_exp = unique_ptr<BaseAST>($1);
+    ast->mode = 1;
+    $$ = ast;
+  }
+  | '+' UnaryExp {
+    auto ast = new UnaryExpAST();
+    ast->op = '+';
+    ast->unary_exp = unique_ptr<BaseAST>($2);
+    ast->mode = 2;
+    $$ = ast;
+  }
+  | '-' UnaryExp {
+    auto ast = new UnaryExpAST();
+    ast->op = '-';
+    ast->unary_exp = unique_ptr<BaseAST>($2);
+    ast->mode = 3;
+    $$ = ast;
+  }
+  | '!' UnaryExp {
+    auto ast = new UnaryExpAST();
+    ast->op = '!';
+    ast->unary_exp = unique_ptr<BaseAST>($2);
+    ast->mode = 4;
+    $$ = ast;
   }
   ;
 
