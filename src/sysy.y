@@ -44,8 +44,7 @@ using namespace std;
 
 // 非终结符的类型定义
 %type <ast_val> FuncDef FuncType Block Stmt
-%type <ast_val> Exp PrimaryExp UnaryExp
-// %type <ast_val> MulExp AddExp
+%type <ast_val> Exp PrimaryExp UnaryExp MulExp AddExp
 // %type <ast_val> RelExp EqExp LandExp LorExp
 // %type <ast_val> Decl ConstDecl BType ConstDef ConstInitVal ConstExp
 // %type <ast_val> VarDecl VarDef InitVal
@@ -116,9 +115,9 @@ Stmt
 
 // Exp ::= AddExp;
 Exp
-  : UnaryExp {
+  : AddExp {
     auto ast = new ExpAST();
-    ast->unary_exp = unique_ptr<BaseAST>($1);
+    ast->add_exp = unique_ptr<BaseAST>($1);
     $$ = ast;
   }
   ;
@@ -174,6 +173,66 @@ UnaryExp
     ast->op = '!';
     ast->unary_exp = unique_ptr<BaseAST>($2);
     ast->mode = 4;
+    $$ = ast;
+  }
+  ;
+
+// MulExp ::= UnaryExp | MulExp ("*" | "/" | "%") UnaryExp;
+MulExp
+  : UnaryExp {
+    auto ast = new MulExpAST();
+    ast->unary_exp = unique_ptr<BaseAST>($1);
+    ast->mode = 1;
+    $$ = ast;
+  }
+  | MulExp '*' UnaryExp {
+    auto ast = new MulExpAST();
+    ast->mul_exp = unique_ptr<BaseAST>($1);
+    ast->op = '*';
+    ast->unary_exp = unique_ptr<BaseAST>($3);
+    ast->mode = 2;
+    $$ = ast;
+  }
+  | MulExp '/' UnaryExp {
+    auto ast = new MulExpAST();
+    ast->mul_exp = unique_ptr<BaseAST>($1);
+    ast->op = '/';
+    ast->unary_exp = unique_ptr<BaseAST>($3);
+    ast->mode = 3;
+    $$ = ast;
+  }
+  | MulExp '%' UnaryExp {
+    auto ast = new MulExpAST();
+    ast->mul_exp = unique_ptr<BaseAST>($1);
+    ast->op = '%';
+    ast->unary_exp = unique_ptr<BaseAST>($3);
+    ast->mode = 4;
+    $$ = ast;
+  }
+  ;
+
+// AddExp ::= MulExp | AddExp ("+" | "-") MulExp;
+AddExp
+  : MulExp {
+    auto ast = new AddExpAST();
+    ast->mul_exp = unique_ptr<BaseAST>($1);
+    ast->mode = 1;
+    $$ = ast;
+  }
+  | AddExp '+' MulExp {
+    auto ast = new AddExpAST();
+    ast->add_exp = unique_ptr<BaseAST>($1);
+    ast->op = '+';
+    ast->mul_exp = unique_ptr<BaseAST>($3);
+    ast->mode = 2;
+    $$ = ast;
+  }
+  | AddExp '-' MulExp {
+    auto ast = new AddExpAST();
+    ast->add_exp = unique_ptr<BaseAST>($1);
+    ast->op = '-';
+    ast->mul_exp = unique_ptr<BaseAST>($3);
+    ast->mode = 3;
     $$ = ast;
   }
   ;

@@ -1,13 +1,18 @@
 #pragma once
+#include <cassert>
 #include <iostream>
 #include <cstring>
+#include <algorithm>
+#include <stack>
+#include <vector>
+#include <map>
 
 // 所有 AST 的基类
 class BaseAST {
   public:
     virtual ~BaseAST() = default;
-    virtual int Cal() const = 0;
-    virtual void Dump(char *str, int & cnt_block, int & ret_value) const = 0;
+    // virtual int Cal() const = 0;
+    virtual void Dump(char *str, int & cnt_block, std::stack<int>* value_st) const = 0;
 };
 
 // CompUnit ::= FuncDef;
@@ -16,10 +21,8 @@ class CompUnitAST : public BaseAST {
     // 用智能指针管理对象
     std::unique_ptr<BaseAST> func_def;
 
-    int Cal() const override { return 0; }
-
-    void Dump(char *str, int & cnt_block, int & ret_value) const override {
-      func_def->Dump(str, cnt_block, ret_value);
+    void Dump(char *str, int & cnt_block, std::stack<int>* value_st) const override {
+      func_def->Dump(str, cnt_block, value_st);
     }
 };
 
@@ -30,16 +33,14 @@ class FuncDefAST : public BaseAST {
     std::string ident;
     std::unique_ptr<BaseAST> block;
 
-    int Cal() const override { return 0; }
-
-    void Dump(char *str, int & cnt_block, int & ret_value) const override {
+    void Dump(char *str, int & cnt_block, std::stack<int>* value_st) const override {
       char stmp[20] = "fun @";
       strcat(stmp, ident.c_str());
       char stmp1[10] = "(): ";
       strcat(stmp, stmp1);
       strcat(str, stmp);
-      func_type->Dump(str, cnt_block, ret_value);
-      block->Dump(str, cnt_block, ret_value);
+      func_type->Dump(str, cnt_block, value_st);
+      block->Dump(str, cnt_block, value_st);
     }
 };
 
@@ -48,9 +49,7 @@ class FuncTypeAST : public BaseAST {
   public:
     std::string type;
 
-    int Cal() const override { return 0; }
-
-    void Dump(char *str, int & cnt_block, int & ret_value) const override {
+    void Dump(char *str, int & cnt_block, std::stack<int>* value_st) const override {
       if (type == "int"){
         char stmp[10] = "i32";
         strcat(str, stmp);
@@ -63,12 +62,10 @@ class BlockAST : public BaseAST {
   public:
     std::unique_ptr<BaseAST> stmt;
 
-    int Cal() const override { return 0; }
-
-    void Dump(char *str, int & cnt_block, int & ret_value) const override {
+    void Dump(char *str, int & cnt_block, std::stack<int>* value_st) const override {
       char stmp[10] = " {\n";
       strcat(str, stmp);
-      stmt->Dump(str, cnt_block, ret_value);
+      stmt->Dump(str, cnt_block, value_st);
       char stmp1[10] = "}\n";
       strcat(str, stmp1);
     }
@@ -79,15 +76,15 @@ class StmtAST : public BaseAST {
   public:
     std::unique_ptr<BaseAST> exp;
 
-    int Cal() const override { return 0; }
-
-    void Dump(char *str, int & cnt_block, int & ret_value) const override {
+    void Dump(char *str, int & cnt_block, std::stack<int>* value_st) const override {
       char stmp[20] = "%entry:\n";
       strcat(str, stmp);
       // int result = exp->Cal();
-      exp->Dump(str, cnt_block, ret_value);
+      exp->Dump(str, cnt_block, value_st);
       char stmp1[20];
       if (cnt_block == 0) {
+        int ret_value = (*value_st).top();
+        (*value_st).pop();
         sprintf(stmp1, "  ret %d\n", ret_value);
       }
       else{
@@ -100,14 +97,10 @@ class StmtAST : public BaseAST {
 // Exp ::= AddExp;
 class ExpAST : public BaseAST {
   public:
-    std::unique_ptr<BaseAST> unary_exp;
+    std::unique_ptr<BaseAST> add_exp;
 
-    int Cal() const override {
-      return unary_exp->Cal();
-    }
-
-    void Dump(char *str, int & cnt_block, int & ret_value) const override {
-      unary_exp->Dump(str, cnt_block, ret_value);
+    void Dump(char *str, int & cnt_block, std::stack<int>* value_st) const override {
+      add_exp->Dump(str, cnt_block, value_st);
     }
 };
 
@@ -117,21 +110,12 @@ class PrimaryExpAST : public BaseAST {
     std::unique_ptr<BaseAST> exp;
     int number, mode;
 
-    int Cal() const override {
+    void Dump(char *str, int & cnt_block, std::stack<int>* value_st) const override {
       if (mode == 1){
-        return 0;
+        exp->Dump(str, cnt_block, value_st);
       }
       else{
-        return number;
-      }
-    }
-
-    void Dump(char *str, int & cnt_block, int & ret_value) const override {
-      if (mode == 1){
-        exp->Dump(str, cnt_block, ret_value);
-      }
-      else{
-        ret_value = number;
+        (*value_st).push(number);
       }
     }
 };
@@ -141,12 +125,8 @@ class NumberAST : public BaseAST {
   public:
     int num;
 
-    int Cal() const override{
-      return num;
-    }
-
-    void Dump(char *str, int & cnt_block, int & ret_value) const override {
-      ret_value = num;
+    void Dump(char *str, int & cnt_block, std::stack<int>* value_st) const override {
+      (*value_st).push(num);
     }
 };
 
@@ -157,27 +137,21 @@ class UnaryExpAST : public BaseAST {
     std::unique_ptr<BaseAST> unary_exp;
     int mode; char op;
 
-    int Cal() const override{
-      if (mode == 1){
-        return primary_exp->Cal();
-      }
-      else{
-        return 0;
-      }
-    }
-
-    void Dump(char *str, int & cnt_block, int & ret_value) const override {
+    void Dump(char *str, int & cnt_block, std::stack<int>* value_st) const override {
       if (mode == 1) {
-        primary_exp->Dump(str, cnt_block, ret_value);
+        primary_exp->Dump(str, cnt_block, value_st);
       }
       else{
-        unary_exp->Dump(str, cnt_block, ret_value);
-        char stmp[20];
+        unary_exp->Dump(str, cnt_block, value_st);
+        char stmp[20]; int ret_value;
         switch (mode){
           case 2: 
             break;
           case 3: 
             if (cnt_block == 0){
+              assert(!(*value_st).empty());
+              ret_value = (*value_st).top();
+              (*value_st).pop();
               sprintf(stmp, "  %%1 = sub 0, %d\n", ret_value);
             }
             else{
@@ -189,6 +163,9 @@ class UnaryExpAST : public BaseAST {
             break;
           case 4: 
             if (cnt_block == 0){
+              assert(!(*value_st).empty());
+              ret_value = (*value_st).top();
+              (*value_st).pop();
               sprintf(stmp, "  %%1 = eq %d, 0\n", ret_value);
             }
             else{
@@ -197,50 +174,161 @@ class UnaryExpAST : public BaseAST {
             // std::cout << "unary_exp dump4" << std::endl;
             cnt_block++;
             strcat(str, stmp);
-          default: break;
+          default: 
+            break;
         }
       }
     }
 };
 
-// // MulExp ::= UnaryExp | MulExp ("*" | "/" | "%") UnaryExp;
-// class MulExpAST : public BaseAST {
-//   public:
-//     std::unique_ptr<BaseAST> unary_exp1;
-//     std::unique_ptr<BaseAST> mul_exp;
-//     std::unique_ptr<BaseAST> unary_exp2;
-//     int mode;
+// MulExp ::= UnaryExp | MulExp ("*" | "/" | "%") UnaryExp;
+class MulExpAST : public BaseAST {
+  public:
+    std::unique_ptr<BaseAST> unary_exp;
+    std::unique_ptr<BaseAST> mul_exp;
+    int mode; char op;
 
-//     int Cal() const override { return 0; }
+    void Dump(char *str, int & cnt_block, std::stack<int>* value_st) const override {
+      int value1, value2;
+      char stmp[20];
+      switch (mode){
+        case 1:
+          // std::cout << "mul_exp dump1" << std::endl;
+          unary_exp->Dump(str, cnt_block, value_st);
+          break;
+        case 2:
+          // std::cout << "mul_exp dump2" << std::endl;
+          mul_exp->Dump(str, cnt_block, value_st);
+          unary_exp->Dump(str, cnt_block, value_st);
+          if ((*value_st).size() >= 2){
+            value1 = (*value_st).top();
+            (*value_st).pop();
+            value2 = (*value_st).top();
+            (*value_st).pop();
+            sprintf(stmp, "  %%%d = mul %d, %d\n", cnt_block+1, value2, value1);
+          }
+          else if ((*value_st).size() == 1){
+            value1 = (*value_st).top();
+            (*value_st).pop();
+            sprintf(stmp, "  %%%d = mul %d, %%%d\n", cnt_block+1, value1, cnt_block);
+          }
+          else{
+            sprintf(stmp, "  %%%d = mul %%%d, %%%d\n", cnt_block+1, cnt_block, cnt_block-1);
+          }
+          strcat(str, stmp);
+          cnt_block++;
+          break;
+        case 3:
+          // std::cout << "mul_exp dump3" << std::endl;
+          mul_exp->Dump(str, cnt_block, value_st);
+          unary_exp->Dump(str, cnt_block, value_st);
+          if ((*value_st).size() >= 2){
+            value1 = (*value_st).top();
+            (*value_st).pop();
+            value2 = (*value_st).top();
+            (*value_st).pop();
+            sprintf(stmp, "  %%%d = div %d, %d\n", cnt_block+1, value2, value1);
+          }
+          else if ((*value_st).size() == 1){
+            value1 = (*value_st).top();
+            (*value_st).pop();
+            sprintf(stmp, "  %%%d = div %d, %%%d\n", cnt_block+1, value1, cnt_block);
+          }
+          else{
+            sprintf(stmp, "  %%%d = div %%%d, %%%d\n", cnt_block+1, cnt_block, cnt_block-1);
+          }
+          strcat(str, stmp);
+          cnt_block++;
+          break;
+        case 4:
+          // std::cout << "mul_exp dump4" << std::endl;
+          mul_exp->Dump(str, cnt_block, value_st);
+          unary_exp->Dump(str, cnt_block, value_st);
+          if ((*value_st).size() >= 2){
+            value1 = (*value_st).top();
+            (*value_st).pop();
+            value2 = (*value_st).top();
+            (*value_st).pop();
+            sprintf(stmp, "  %%%d = mod %d, %d\n", cnt_block+1, value2, value1);
+          }
+          else if ((*value_st).size() == 1){
+            value1 = (*value_st).top();
+            (*value_st).pop();
+            sprintf(stmp, "  %%%d = mod %d, %%%d\n", cnt_block+1, value1, cnt_block);
+          }
+          else{
+            sprintf(stmp, "  %%%d = mod %%%d, %%%d\n", cnt_block+1, cnt_block, cnt_block-1);
+          }
+          strcat(str, stmp);
+          cnt_block++;
+          break;
+        default:
+          break;
+      }
+    }
+};
 
-//     void Dump(char *str, int & cnt_block, int & ret_value) const override {
-//       if (mode == 1){
-//         unary_exp1->Dump(str, cnt_block, ret_value);
-//       }
-//       else{
-//         mul_exp->Dump(str, cnt_block, ret_value);
-//         unary_exp2->Dump(str, cnt_block, ret_value);
-//       }
-//     }
-// };
+// AddExp ::= MulExp | AddExp ("+" | "-") MulExp;
+class AddExpAST : public BaseAST {
+  public:
+    std::unique_ptr<BaseAST> mul_exp;
+    std::unique_ptr<BaseAST> add_exp;
+    int mode; char op;
 
-// // AddExp ::= MulExp | AddExp ("+" | "-") MulExp;
-// class AddExpAST : public BaseAST {
-//   public:
-//     std::unique_ptr<BaseAST> mul_exp1;
-//     std::unique_ptr<BaseAST> add_exp;
-//     std::unique_ptr<BaseAST> mul_exp2;
-//     int mode;
-
-//     int Cal() const override { return 0; }
-
-//     void Dump(char *str, int & cnt_block, int & ret_value) const override {
-//       if (mode == 1){
-//         mul_exp1->Dump(str, cnt_block, ret_value);
-//       }
-//       else{
-//         add_exp->Dump(str, cnt_block, ret_value);
-//         mul_exp2->Dump(str, cnt_block, ret_value);
-//       }
-//     }
-// };
+    void Dump(char *str, int & cnt_block, std::stack<int>* value_st) const override {
+      int value1, value2;
+      char stmp[20];
+      switch (mode){
+        case 1:
+          // std::cout << "add_exp dump1" << std::endl;
+          mul_exp->Dump(str, cnt_block, value_st);
+          break;
+        case 2:
+          // std::cout << "add_exp dump2" << std::endl;
+          add_exp->Dump(str, cnt_block, value_st);
+          mul_exp->Dump(str, cnt_block, value_st);
+          if ((*value_st).size() >= 2){
+            value1 = (*value_st).top();
+            (*value_st).pop();
+            value2 = (*value_st).top();
+            (*value_st).pop();
+            sprintf(stmp, "  %%%d = add %d, %d\n", cnt_block+1, value2, value1);
+          }
+          else if ((*value_st).size() == 1){
+            value1 = (*value_st).top();
+            (*value_st).pop();
+            sprintf(stmp, "  %%%d = add %d, %%%d\n", cnt_block+1, value1, cnt_block);
+          }
+          else{
+            sprintf(stmp, "  %%%d = add %%%d, %%%d\n", cnt_block+1, cnt_block, cnt_block-1);
+          }
+          strcat(str, stmp);
+          cnt_block++;
+          break;
+        case 3:
+          // std::cout << "add_exp dump3" << std::endl;
+          add_exp->Dump(str, cnt_block, value_st);
+          mul_exp->Dump(str, cnt_block, value_st);
+          if ((*value_st).size() >= 2){
+            value1 = (*value_st).top();
+            (*value_st).pop();
+            value2 = (*value_st).top();
+            (*value_st).pop();
+            sprintf(stmp, "  %%%d = sub %d, %d\n", cnt_block+1, value2, value1);
+          }
+          else if ((*value_st).size() == 1){
+            value1 = (*value_st).top();
+            (*value_st).pop();
+            sprintf(stmp, "  %%%d = sub %d, %%%d\n", cnt_block+1, value1, cnt_block);
+          }
+          else{
+            sprintf(stmp, "  %%%d = sub %%%d, %%%d\n", cnt_block+1, cnt_block, cnt_block-1);
+          }
+          strcat(str, stmp);
+          cnt_block++;
+          break;
+        default:
+          break;
+      }
+    }
+};

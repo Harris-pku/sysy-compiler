@@ -8,29 +8,69 @@
 #include <cstring>
 #include "koopa.h"
 
-// 函数声明
-void Visit_pro(const koopa_raw_program_t &);
-void Visit_slice(const koopa_raw_slice_t &);
-void Visit_func(const koopa_raw_function_t &);
-void Visit_block(const koopa_raw_basic_block_t &);
-void Visit_inst(const koopa_raw_value_t &);
-void Visit_ret(const koopa_raw_return_t &);
-void Visit_inte(const koopa_raw_integer_t &);
+int cnt_reg;
 
 // 访问 integer
-void Visit_inte(const koopa_raw_integer_t &integer){
-    int value = integer.value;
-    std::cout << value;
+void Visit_integer(const koopa_raw_integer_t &integer){
+  int value = integer.value;
+  std::cout << value;
+}
+
+// 访问 binary 指令
+void Visit_binary(const koopa_raw_binary_t &binary){
+  koopa_raw_value_t lhs = binary.lhs;
+  koopa_raw_value_t rhs = binary.rhs;
+  switch (binary.op){
+    // Equal to
+    case KOOPA_RBO_EQ:
+      if (lhs->kind.tag == KOOPA_RVT_INTEGER){
+        printf("  li    t%d, ", cnt_reg);
+        Visit_integer(lhs->kind.data.integer);
+        std::cout << std::endl;
+      }
+      if (rhs->kind.data.integer.value == 0){
+        printf("  xor   t%d, t%d, x0\n", cnt_reg, cnt_reg);
+        printf("  seqz  t%d, t%d\n", cnt_reg, cnt_reg);
+      }
+      // cnt_reg++;
+      break;
+    // Subtraction
+    case KOOPA_RBO_SUB:
+      if (rhs->kind.tag == KOOPA_RVT_INTEGER){
+        printf("  li    t%d, ", cnt_reg);
+        Visit_integer(rhs->kind.data.integer);
+        std::cout << std::endl;
+      }
+      if (lhs->kind.data.integer.value == 0){
+        printf("  sub   t%d, x0, t%d\n", cnt_reg+1, cnt_reg);
+      }
+      cnt_reg++;
+      break;
+    default:
+      assert(false);
+      break;
+  }
 }
 
 // 访问 return 指令
 void Visit_ret(const koopa_raw_return_t &ret){
-    koopa_raw_value_t ret_value = ret.value;
-    assert(ret_value->kind.tag == KOOPA_RVT_INTEGER);
-    std::cout << "  li a0, ";
-    Visit_inte(ret_value->kind.data.integer);
-    std::cout << std::endl;
-    std::cout << "  ret" << std::endl;
+  koopa_raw_value_t ret_value = ret.value;
+  switch (ret_value->kind.tag) {
+    // 直接返回数字
+    case KOOPA_RVT_INTEGER:
+      std::cout << "  li    a0, ";
+      Visit_integer(ret_value->kind.data.integer);
+      printf("\n  ret\n");
+      break;
+    // 返回运算结果
+    case KOOPA_RVT_BINARY:
+      printf("  mv    a0, t%d\n", cnt_reg);
+      printf("  ret\n");
+      break;
+    default:
+      assert(false);
+      break;
+  }  
 }
 
 // 访问指令
@@ -44,7 +84,7 @@ void Visit_inst(const koopa_raw_value_t &value){
       break;
     case KOOPA_RVT_INTEGER:
       // 访问 integer 指令
-      Visit_inte(kind.data.integer);
+      Visit_integer(kind.data.integer);
       break;
     default:
       // 其他类型暂时遇不到
