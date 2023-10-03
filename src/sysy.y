@@ -45,7 +45,7 @@ using namespace std;
 // 非终结符的类型定义
 %type <ast_val> FuncDef FuncType Block Stmt
 %type <ast_val> Exp PrimaryExp UnaryExp MulExp AddExp
-// %type <ast_val> RelExp EqExp LandExp LorExp
+%type <ast_val> RelExp EqExp LAndExp LOrExp
 // %type <ast_val> Decl ConstDecl BType ConstDef ConstInitVal ConstExp
 // %type <ast_val> VarDecl VarDef InitVal
 // %type <ast_val> LVal BlockItem FuncFParams FuncFParam
@@ -113,11 +113,11 @@ Stmt
   }
   ;
 
-// Exp ::= AddExp;
+// Exp ::= LOrExp;
 Exp
-  : AddExp {
+  : LOrExp {
     auto ast = new ExpAST();
-    ast->add_exp = unique_ptr<BaseAST>($1);
+    ast->lor_exp = unique_ptr<BaseAST>($1);
     $$ = ast;
   }
   ;
@@ -236,6 +236,102 @@ AddExp
     $$ = ast;
   }
   ;
+
+// RelExp ::= AddExp | RelExp ("<" | ">" | "<=" | ">=") AddExp;
+RelExp
+  : AddExp {
+    auto ast = new RelExpAST();
+    ast->add_exp = unique_ptr<BaseAST>($1);
+    ast->mode = 1;
+    $$ = ast;
+  }
+  | RelExp '<' AddExp {
+    auto ast = new RelExpAST();
+    ast->rel_exp = unique_ptr<BaseAST>($1);
+    ast->add_exp = unique_ptr<BaseAST>($3);
+    ast->mode = 2;
+    $$ = ast;
+  }
+  | RelExp '>' AddExp {
+    auto ast = new RelExpAST();
+    ast->rel_exp = unique_ptr<BaseAST>($1);
+    ast->add_exp = unique_ptr<BaseAST>($3);
+    ast->mode = 3;
+    $$ = ast;
+  }
+  | RelExp LE AddExp {
+    auto ast = new RelExpAST();
+    ast->rel_exp = unique_ptr<BaseAST>($1);
+    ast->add_exp = unique_ptr<BaseAST>($3);
+    ast->mode = 4;
+    $$ = ast;
+  }
+  | RelExp GE AddExp {
+    auto ast = new RelExpAST();
+    ast->rel_exp = unique_ptr<BaseAST>($1);
+    ast->add_exp = unique_ptr<BaseAST>($3);
+    ast->mode = 5;
+    $$ = ast;
+  }
+  ;
+
+// EqExp ::= RelExp | EqExp ("==" | "!=") RelExp;
+EqExp
+  : RelExp {
+    auto ast = new EqExpAST();
+    ast->rel_exp = unique_ptr<BaseAST>($1);
+    ast->mode = 1;
+    $$ = ast;
+  }
+  | EqExp EQ RelExp {
+    auto ast = new EqExpAST();
+    ast->eq_exp = unique_ptr<BaseAST>($1);
+    ast->rel_exp = unique_ptr<BaseAST>($3);
+    ast->mode = 2;
+    $$ = ast;
+  }
+  | EqExp NE RelExp {
+    auto ast = new EqExpAST();
+    ast->eq_exp = unique_ptr<BaseAST>($1);
+    ast->rel_exp = unique_ptr<BaseAST>($3);
+    ast->mode = 3;
+    $$ = ast;
+  }
+  ;
+
+// LAndExp ::= EqExp | LAndExp "&&" EqExp;
+LAndExp
+  : EqExp {
+    auto ast = new LAndExpAST();
+    ast->eq_exp = unique_ptr<BaseAST>($1);
+    ast->mode = 1;
+    $$ = ast;
+  }
+  | LAndExp AND EqExp {
+    auto ast = new LAndExpAST();
+    ast->land_exp = unique_ptr<BaseAST>($1);
+    ast->eq_exp = unique_ptr<BaseAST>($3);
+    ast->mode = 2;
+    $$ = ast;
+  }
+  ;
+
+// LOrExp ::= LAndExp | LOrExp "||" LAndExp;
+LOrExp
+  : LAndExp {
+    auto ast = new LOrExpAST();
+    ast->land_exp = unique_ptr<BaseAST>($1);
+    ast->mode = 1;
+    $$ = ast;
+  }
+  | LOrExp OR LAndExp {
+    auto ast = new LOrExpAST();
+    ast->lor_exp = unique_ptr<BaseAST>($1);
+    ast->land_exp = unique_ptr<BaseAST>($3);
+    ast->mode = 2;
+    $$ = ast;
+  }
+
 
 %%
 

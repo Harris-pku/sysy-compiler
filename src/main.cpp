@@ -49,7 +49,7 @@ int main(int argc, const char *argv[]) {
     // 输出解析得到的 AST, 其实就是个字符串
     ast->Dump(str, cnt_block, value_st);
     if (mode[1] == 'k'){
-        cout << str << endl;
+        cout << str;
     } else if (mode[1] == 'r'){
         solve_koopa(str);
     } else {

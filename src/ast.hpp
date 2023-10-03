@@ -94,13 +94,13 @@ class StmtAST : public BaseAST {
     }
 };
 
-// Exp ::= AddExp;
+// Exp ::= LorExp;
 class ExpAST : public BaseAST {
   public:
-    std::unique_ptr<BaseAST> add_exp;
+    std::unique_ptr<BaseAST> lor_exp;
 
     void Dump(char *str, int & cnt_block, std::stack<int>* value_st) const override {
-      add_exp->Dump(str, cnt_block, value_st);
+      lor_exp->Dump(str, cnt_block, value_st);
     }
 };
 
@@ -329,6 +329,323 @@ class AddExpAST : public BaseAST {
           break;
         default:
           break;
+      }
+    }
+};
+
+// RelExp ::= AddExp | RelExp ("<" | ">" | "<=" | ">=") AddExp;
+class RelExpAST : public BaseAST {
+  public:
+    std::unique_ptr<BaseAST> add_exp;
+    std::unique_ptr<BaseAST> rel_exp;
+    int mode;
+
+    void Dump(char *str, int & cnt_block, std::stack<int>* value_st) const override {
+      int value1, value2;
+      char stmp[20];
+      switch (mode){
+        case 1:
+          add_exp->Dump(str, cnt_block, value_st);
+          break;
+        case 2:
+          rel_exp->Dump(str, cnt_block, value_st);
+          add_exp->Dump(str, cnt_block, value_st);
+          if ((*value_st).size() >= 2){
+            value1 = (*value_st).top();
+            (*value_st).pop();
+            value2 = (*value_st).top();
+            (*value_st).pop();
+            sprintf(stmp, "  %%%d = lt %d, %d\n", cnt_block+1, value2, value1);
+          }
+          else if ((*value_st).size() == 1){
+            value1 = (*value_st).top();
+            (*value_st).pop();
+            sprintf(stmp, "  %%%d = lt %d, %%%d\n", cnt_block+1, value1, cnt_block);
+          }
+          else{
+            sprintf(stmp, "  %%%d = lt %%%d, %%%d\n", cnt_block+1, cnt_block, cnt_block-1);
+          }
+          strcat(str, stmp);
+          cnt_block++;
+          break;
+        case 3:
+          rel_exp->Dump(str, cnt_block, value_st);
+          add_exp->Dump(str, cnt_block, value_st);
+          if ((*value_st).size() >= 2){
+            value1 = (*value_st).top();
+            (*value_st).pop();
+            value2 = (*value_st).top();
+            (*value_st).pop();
+            sprintf(stmp, "  %%%d = gt %d, %d\n", cnt_block+1, value2, value1);
+          }
+          else if ((*value_st).size() == 1){
+            value1 = (*value_st).top();
+            (*value_st).pop();
+            sprintf(stmp, "  %%%d = gt %d, %%%d\n", cnt_block+1, value1, cnt_block);
+          }
+          else{
+            sprintf(stmp, "  %%%d = gt %%%d, %%%d\n", cnt_block+1, cnt_block, cnt_block-1);
+          }
+          strcat(str, stmp);
+          cnt_block++;
+          break;
+        case 4:
+          rel_exp->Dump(str, cnt_block, value_st);
+          add_exp->Dump(str, cnt_block, value_st);
+          if ((*value_st).size() >= 2){
+            value1 = (*value_st).top();
+            (*value_st).pop();
+            value2 = (*value_st).top();
+            (*value_st).pop();
+            sprintf(stmp, "  %%%d = le %d, %d\n", cnt_block+1, value2, value1);
+          }
+          else if ((*value_st).size() == 1){
+            value1 = (*value_st).top();
+            (*value_st).pop();
+            sprintf(stmp, "  %%%d = le %d, %%%d\n", cnt_block+1, value1, cnt_block);
+          }
+          else{
+            sprintf(stmp, "  %%%d = le %%%d, %%%d\n", cnt_block+1, cnt_block, cnt_block-1);
+          }
+          strcat(str, stmp);
+          cnt_block++;
+          break;
+        case 5:
+          rel_exp->Dump(str, cnt_block, value_st);
+          add_exp->Dump(str, cnt_block, value_st);
+          if ((*value_st).size() >= 2){
+            value1 = (*value_st).top();
+            (*value_st).pop();
+            value2 = (*value_st).top();
+            (*value_st).pop();
+            sprintf(stmp, "  %%%d = ge %d, %d\n", cnt_block+1, value2, value1);
+          }
+          else if ((*value_st).size() == 1){
+            value1 = (*value_st).top();
+            (*value_st).pop();
+            sprintf(stmp, "  %%%d = ge %d, %%%d\n", cnt_block+1, value1, cnt_block);
+          }
+          else{
+            sprintf(stmp, "  %%%d = ge %%%d, %%%d\n", cnt_block+1, cnt_block, cnt_block-1);
+          }
+          strcat(str, stmp);
+          cnt_block++;
+          break;
+        default:
+          break;
+      }
+    }
+};
+
+// EqExp ::= RelExp | EqExp ("==" | "!=") RelExp;
+class EqExpAST : public BaseAST {
+  public:
+    std::unique_ptr<BaseAST> rel_exp;
+    std::unique_ptr<BaseAST> eq_exp;
+    int mode;
+
+    void Dump(char *str, int & cnt_block, std::stack<int>* value_st) const override {
+      int value1, value2;
+      char stmp[20];
+      switch (mode){
+        case 1:
+          rel_exp->Dump(str, cnt_block, value_st);
+          break;
+        case 2:
+          eq_exp->Dump(str, cnt_block, value_st);
+          rel_exp->Dump(str, cnt_block, value_st);
+          if ((*value_st).size() >= 2){
+            value1 = (*value_st).top();
+            (*value_st).pop();
+            value2 = (*value_st).top();
+            (*value_st).pop();
+            sprintf(stmp, "  %%%d = eq %d, %d\n", cnt_block+1, value2, value1);
+          }
+          else if ((*value_st).size() == 1){
+            value1 = (*value_st).top();
+            (*value_st).pop();
+            sprintf(stmp, "  %%%d = eq %d, %%%d\n", cnt_block+1, value1, cnt_block);
+          }
+          else{
+            sprintf(stmp, "  %%%d = eq %%%d, %%%d\n", cnt_block+1, cnt_block, cnt_block-1);
+          }
+          strcat(str, stmp);
+          cnt_block++;
+          break;
+        case 3:
+          eq_exp->Dump(str, cnt_block, value_st);
+          rel_exp->Dump(str, cnt_block, value_st);
+          if ((*value_st).size() >= 2){
+            value1 = (*value_st).top();
+            (*value_st).pop();
+            value2 = (*value_st).top();
+            (*value_st).pop();
+            sprintf(stmp, "  %%%d = ne %d, %d\n", cnt_block+1, value2, value1);
+          }
+          else if ((*value_st).size() == 1){
+            value1 = (*value_st).top();
+            (*value_st).pop();
+            sprintf(stmp, "  %%%d = ne %d, %%%d\n", cnt_block+1, value1, cnt_block);
+          }
+          else{
+            sprintf(stmp, "  %%%d = ne %%%d, %%%d\n", cnt_block+1, cnt_block, cnt_block-1);
+          }
+          strcat(str, stmp);
+          cnt_block++;
+          break;
+        default: break;
+      }
+    }
+};
+
+// LAndExp ::= EqExp | LAndExp "&&" EqExp;
+class LAndExpAST : public BaseAST {
+  public:
+    std::unique_ptr<BaseAST> eq_exp;
+    std::unique_ptr<BaseAST> land_exp;
+    int mode;
+
+    void Dump(char *str, int & cnt_block, std::stack<int>* value_st) const override {
+      int value1, value2;
+      char stmp[20];
+      switch (mode){
+        case 1:
+          eq_exp->Dump(str, cnt_block, value_st);
+          break;
+        case 2:
+          land_exp->Dump(str, cnt_block, value_st);
+          eq_exp->Dump(str, cnt_block, value_st);
+          if ((*value_st).size() >= 2){
+            value1 = (*value_st).top();
+            (*value_st).pop();
+            value2 = (*value_st).top();
+            (*value_st).pop();
+            sprintf(stmp, "  %%%d = eq %d, 0\n", cnt_block+1, value2);
+            strcat(str, stmp);
+            cnt_block++;
+            sprintf(stmp, "  %%%d = eq %%%d, 0\n", cnt_block+1, cnt_block);
+            strcat(str, stmp);
+            cnt_block++;
+            sprintf(stmp, "  %%%d = eq %d, 0\n", cnt_block+1, value1);
+            strcat(str, stmp);
+            cnt_block++;
+            sprintf(stmp, "  %%%d = eq %%%d, 0\n", cnt_block+1, cnt_block);
+            strcat(str, stmp);
+            cnt_block++;
+            sprintf(stmp, "  %%%d = and %%%d, %%%d\n", cnt_block+1, cnt_block, cnt_block-2);
+          }
+          else if ((*value_st).size() == 1){
+            value1 = (*value_st).top();
+            (*value_st).pop();
+            sprintf(stmp, "  %%%d = eq %%%d, 0\n", cnt_block+1, cnt_block);
+            strcat(str, stmp);
+            cnt_block++;
+            sprintf(stmp, "  %%%d = eq %%%d, 0\n", cnt_block+1, cnt_block);
+            strcat(str, stmp);
+            cnt_block++;
+            sprintf(stmp, "  %%%d = eq %d, 0\n", cnt_block+1, value1);
+            strcat(str, stmp);
+            cnt_block++;
+            sprintf(stmp, "  %%%d = eq %%%d, 0\n", cnt_block+1, cnt_block);
+            strcat(str, stmp);
+            cnt_block++;
+            sprintf(stmp, "  %%%d = and %%%d, %%%d\n", cnt_block+1, cnt_block, cnt_block-2);            
+          }
+          else{
+            sprintf(stmp, "  %%%d = eq %%%d, 0\n", cnt_block+1, cnt_block);
+            strcat(str, stmp);
+            cnt_block++;
+            sprintf(stmp, "  %%%d = eq %%%d, 0\n", cnt_block+1, cnt_block);
+            strcat(str, stmp);
+            cnt_block++;
+            sprintf(stmp, "  %%%d = eq %%%d, 0\n", cnt_block+1, cnt_block-3);
+            strcat(str, stmp);
+            cnt_block++;
+            sprintf(stmp, "  %%%d = eq %%%d, 0\n", cnt_block+1, cnt_block);
+            strcat(str, stmp);
+            cnt_block++;
+            sprintf(stmp, "  %%%d = and %%%d, %%%d\n", cnt_block+1, cnt_block, cnt_block-2);
+          }
+          strcat(str, stmp);
+          cnt_block++;
+          break;
+        default: break;
+      }
+    }
+};
+
+// LOrExp ::= LAndExp | LOrExp "||" LAndExp;
+class LOrExpAST : public BaseAST {
+  public:
+    std::unique_ptr<BaseAST> land_exp;
+    std::unique_ptr<BaseAST> lor_exp;
+    int mode;
+
+    void Dump(char *str, int & cnt_block, std::stack<int>* value_st) const override {
+      int value1, value2;
+      char stmp[20];
+      switch (mode){
+        case 1:
+          land_exp->Dump(str, cnt_block, value_st);
+          break;
+        case 2:
+          lor_exp->Dump(str, cnt_block, value_st);
+          land_exp->Dump(str, cnt_block, value_st);
+          if ((*value_st).size() >= 2){
+            value1 = (*value_st).top();
+            (*value_st).pop();
+            value2 = (*value_st).top();
+            (*value_st).pop();
+            sprintf(stmp, "  %%%d = eq %d, 0\n", cnt_block+1, value2);
+            strcat(str, stmp);
+            cnt_block++;
+            sprintf(stmp, "  %%%d = eq %%%d, 0\n", cnt_block+1, cnt_block);
+            strcat(str, stmp);
+            cnt_block++;
+            sprintf(stmp, "  %%%d = eq %d, 0\n", cnt_block+1, value1);
+            strcat(str, stmp);
+            cnt_block++;
+            sprintf(stmp, "  %%%d = eq %%%d, 0\n", cnt_block+1, cnt_block);
+            strcat(str, stmp);
+            cnt_block++;
+            sprintf(stmp, "  %%%d = or %%%d, %%%d\n", cnt_block+1, cnt_block, cnt_block-2);
+          }
+          else if ((*value_st).size() == 1){
+            value1 = (*value_st).top();
+            (*value_st).pop();
+            sprintf(stmp, "  %%%d = eq %%%d, 0\n", cnt_block+1, cnt_block);
+            strcat(str, stmp);
+            cnt_block++;
+            sprintf(stmp, "  %%%d = eq %%%d, 0\n", cnt_block+1, cnt_block);
+            strcat(str, stmp);
+            cnt_block++;
+            sprintf(stmp, "  %%%d = eq %d, 0\n", cnt_block+1, value1);
+            strcat(str, stmp);
+            cnt_block++;
+            sprintf(stmp, "  %%%d = eq %%%d, 0\n", cnt_block+1, cnt_block);
+            strcat(str, stmp);
+            cnt_block++;
+            sprintf(stmp, "  %%%d = or %%%d, %%%d\n", cnt_block+1, cnt_block, cnt_block-2);            
+          }
+          else{
+            sprintf(stmp, "  %%%d = eq %%%d, 0\n", cnt_block+1, cnt_block);
+            strcat(str, stmp);
+            cnt_block++;
+            sprintf(stmp, "  %%%d = eq %%%d, 0\n", cnt_block+1, cnt_block);
+            strcat(str, stmp);
+            cnt_block++;
+            sprintf(stmp, "  %%%d = eq %%%d, 0\n", cnt_block+1, cnt_block-3);
+            strcat(str, stmp);
+            cnt_block++;
+            sprintf(stmp, "  %%%d = eq %%%d, 0\n", cnt_block+1, cnt_block);
+            strcat(str, stmp);
+            cnt_block++;
+            sprintf(stmp, "  %%%d = or %%%d, %%%d\n", cnt_block+1, cnt_block, cnt_block-2);
+          }
+          strcat(str, stmp);
+          cnt_block++;
+          break;
+        default: break;
       }
     }
 };
