@@ -6,7 +6,9 @@
 #include <memory>
 #include <string>
 #include <stack>
+#include <map>
 #include "ast.hpp"
+#include "sym.hpp"
 
 using namespace std;
 
@@ -20,8 +22,9 @@ extern FILE *yyout;
 extern int yyparse(unique_ptr<BaseAST> &ast);
 extern void solve_koopa(char *str);
 
-int cnt_block;
-stack<int>* value_st = new stack<int>;
+int cnt;
+stack<num_t>* val_st = new stack<num_t>;
+map<string, sym_t>* val_ma = new map<string, sym_t>;
 
 int main(int argc, const char *argv[]) {
     // 解析命令行参数. 测试脚本/评测平台要求你的编译器能接收如下参数:
@@ -47,7 +50,7 @@ int main(int argc, const char *argv[]) {
     char *str = (char *)malloc(10000 * sizeof(char));
 
     // 输出解析得到的 AST, 其实就是个字符串
-    ast->Dump(str, cnt_block, value_st);
+    ast->Dump(str, cnt, val_st, val_ma);
     if (mode[1] == 'k'){
         cout << str;
     } else if (mode[1] == 'r'){

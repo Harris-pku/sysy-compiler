@@ -48,7 +48,7 @@ using namespace std;
 %type <ast_val> RelExp EqExp LAndExp LOrExp
 %type <ast_val> Decl ConstDecl ConstDefArr ConstDef
 %type <ast_val> LVal BlockItemArr ConstInitVal ConstExp
-// %type <ast_val> VarDecl VarDefArr VarDef InitVal
+%type <ast_val> VarDecl VarDefArr VarDef InitVal
 // %type <ast_val> FuncFParams FuncFParam
 %type <int_val> Number
 
@@ -67,11 +67,18 @@ CompUnit
   }
   ;
 
-// Decl ::= ConstDecl;
+// Decl ::= ConstDecl | VarDecl;
 Decl
   : ConstDecl {
     auto ast = new DeclAST();
     ast->const_decl = unique_ptr<BaseAST>($1);
+    ast->mode = 1;
+    $$ = ast;
+  }
+  | VarDecl {
+    auto ast = new DeclAST();
+    ast->var_decl = unique_ptr<BaseAST>($1);
+    ast->mode = 2;
     $$ = ast;
   }
   ;
@@ -117,6 +124,58 @@ ConstInitVal
   : ConstExp {
     auto ast = new ConstInitValAST();
     ast->const_exp = unique_ptr<BaseAST>($1);
+    $$ = ast;
+  }
+  ;
+
+// VarDecl ::= INT VarDefArr ";";
+VarDecl
+  : INT VarDefArr ';' {
+    auto ast = new VarDeclAST();
+    ast->var_def_arr = unique_ptr<BaseAST>($2);
+    $$ = ast;
+  }
+  ;
+
+// VarDefArr ::= VarDefArr "," VarDef | VarDef;
+VarDefArr
+  : VarDefArr ',' VarDef {
+    auto ast = new VarDefArrAST();
+    ast->var_def_arr = unique_ptr<BaseAST>($1);
+    ast->var_def = unique_ptr<BaseAST>($3);
+    ast->mode = 1;
+    $$ = ast;
+  }
+  | VarDef {
+    auto ast = new VarDefArrAST();
+    ast->var_def = unique_ptr<BaseAST>($1);
+    ast->mode = 2;
+    $$ = ast;
+  }
+  ;
+
+// VarDef ::= IDENT | IDENT "=" InitVal;
+VarDef
+  : IDENT {
+    auto ast = new VarDefAST();
+    ast->ident = *unique_ptr<string>($1);
+    ast->mode = 1;
+    $$ = ast;
+  }
+  | IDENT '=' InitVal {
+    auto ast = new VarDefAST();
+    ast->ident = *unique_ptr<string>($1);
+    ast->init_val = unique_ptr<BaseAST>($3);
+    ast->mode = 2;
+    $$ = ast;
+  }
+  ;
+
+// InitVal ::= Exp;
+InitVal
+  : Exp {
+    auto ast = new InitValAST();
+    ast->exp = unique_ptr<BaseAST>($1);
     $$ = ast;
   }
   ;
@@ -182,11 +241,83 @@ BlockItemArr
   }
   ; 
 
-// Stmt ::= "return" Exp ";";
+// Stmt ::= LVal "=" Exp ";"
+//        | ";"
+//        | Exp ";"
+//        | Block
+//        | IF "(" Exp ")" Stmt
+//        | IF "(" Exp ")" Stmt ELSE Stmt
+//        | WHILE "(" Exp ")" Stmt
+//        | BREAK ";"
+//        | CONTINUE ";"
+//        | RETURN ";"
+//        | RETURN Exp ";";
 Stmt
-  : RETURN Exp ';' {
+  : IDENT '=' Exp ';' {
+    auto ast = new StmtAST();
+    ast->ident = *unique_ptr<string>($1);
+    ast->exp = unique_ptr<BaseAST>($3);
+    ast->mode = 1;
+    $$ = ast;
+  }
+  | ';' {
+    auto ast = new StmtAST();
+    ast->mode = 2;
+    $$ = ast;
+  }
+  | Exp ';' {
+    auto ast = new StmtAST();
+    ast->exp = unique_ptr<BaseAST>($1);
+    ast->mode = 3;
+    $$ = ast;
+  }
+  | Block {
+    auto ast = new StmtAST();
+    ast->block = unique_ptr<BaseAST>($1);
+    ast->mode = 4;
+    $$ = ast;
+  }
+  | IF '(' Exp ')' Stmt{
+    auto ast = new StmtAST();
+    ast->exp = unique_ptr<BaseAST>($3);
+    ast->stmt = unique_ptr<BaseAST>($5);
+    ast->mode = 5;
+    $$ = ast;
+  }
+  | IF '(' Exp ')' Stmt ELSE Stmt {
+    auto ast = new StmtAST();
+    ast->exp = unique_ptr<BaseAST>($3);
+    ast->stmt = unique_ptr<BaseAST>($5);
+    ast->else_stmt = unique_ptr<BaseAST>($7);
+    ast->mode = 6;
+    $$ = ast;
+  }
+  | WHILE '(' Exp ')' Stmt {
+    auto ast = new StmtAST();
+    ast->exp = unique_ptr<BaseAST>($3);
+    ast->stmt = unique_ptr<BaseAST>($5);
+    ast->mode = 7;
+    $$ = ast;
+  }
+  | BREAK ';' {
+    auto ast = new StmtAST();
+    ast->mode = 8;
+    $$ = ast;
+  }
+  | CONTINUE ';' {
+    auto ast = new StmtAST();
+    ast->mode = 9;
+    $$ = ast;
+  }
+  | RETURN ';' {
+    auto ast = new StmtAST();
+    ast->mode = 10;
+    $$ = ast;
+  }
+  | RETURN Exp ';' {
     auto ast = new StmtAST();
     ast->exp = unique_ptr<BaseAST>($2);
+    ast->mode = 11;
     $$ = ast;
   }
   ;
@@ -249,21 +380,18 @@ UnaryExp
   }
   | '+' UnaryExp {
     auto ast = new UnaryExpAST();
-    ast->op = '+';
     ast->unary_exp = unique_ptr<BaseAST>($2);
     ast->mode = 2;
     $$ = ast;
   }
   | '-' UnaryExp {
     auto ast = new UnaryExpAST();
-    ast->op = '-';
     ast->unary_exp = unique_ptr<BaseAST>($2);
     ast->mode = 3;
     $$ = ast;
   }
   | '!' UnaryExp {
     auto ast = new UnaryExpAST();
-    ast->op = '!';
     ast->unary_exp = unique_ptr<BaseAST>($2);
     ast->mode = 4;
     $$ = ast;
@@ -281,7 +409,6 @@ MulExp
   | MulExp '*' UnaryExp {
     auto ast = new MulExpAST();
     ast->mul_exp = unique_ptr<BaseAST>($1);
-    ast->op = '*';
     ast->unary_exp = unique_ptr<BaseAST>($3);
     ast->mode = 2;
     $$ = ast;
@@ -289,7 +416,6 @@ MulExp
   | MulExp '/' UnaryExp {
     auto ast = new MulExpAST();
     ast->mul_exp = unique_ptr<BaseAST>($1);
-    ast->op = '/';
     ast->unary_exp = unique_ptr<BaseAST>($3);
     ast->mode = 3;
     $$ = ast;
@@ -297,7 +423,6 @@ MulExp
   | MulExp '%' UnaryExp {
     auto ast = new MulExpAST();
     ast->mul_exp = unique_ptr<BaseAST>($1);
-    ast->op = '%';
     ast->unary_exp = unique_ptr<BaseAST>($3);
     ast->mode = 4;
     $$ = ast;
@@ -315,7 +440,6 @@ AddExp
   | AddExp '+' MulExp {
     auto ast = new AddExpAST();
     ast->add_exp = unique_ptr<BaseAST>($1);
-    ast->op = '+';
     ast->mul_exp = unique_ptr<BaseAST>($3);
     ast->mode = 2;
     $$ = ast;
@@ -323,7 +447,6 @@ AddExp
   | AddExp '-' MulExp {
     auto ast = new AddExpAST();
     ast->add_exp = unique_ptr<BaseAST>($1);
-    ast->op = '-';
     ast->mul_exp = unique_ptr<BaseAST>($3);
     ast->mode = 3;
     $$ = ast;
