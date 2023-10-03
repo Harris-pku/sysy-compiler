@@ -26,6 +26,69 @@ class CompUnitAST : public BaseAST {
     }
 };
 
+// Decl ::= ConstDecl | VarDecl;
+class DeclAST : public BaseAST {
+  public:
+    std::unique_ptr<BaseAST> const_decl;
+
+    void Dump(char *str, int & cnt_block, std::stack<int>* value_st) const override {
+      const_decl->Dump(str, cnt_block, value_st);
+    }
+};
+
+// ConstDecl ::= CONST INT ConstDefArr ";";
+class ConstDeclAST : public BaseAST {
+  public:
+    std::unique_ptr<BaseAST> const_def_arr;
+
+    void Dump(char *str, int & cnt_block, std::stack<int>* value_st) const override {
+      const_def_arr->Dump(str, cnt_block, value_st);
+    }
+};
+
+// ConstDefArr ::= ConstDefArr "," ConstDef | ConstDef; 
+class ConstDefArrAST : public BaseAST {
+  public:
+    std::unique_ptr<BaseAST> const_def_arr;
+    std::unique_ptr<BaseAST> const_def;
+    int mode;
+
+    void Dump(char *str, int & cnt_block, std::stack<int>* value_st) const override {
+      switch (mode){
+        case 1:
+          const_def_arr->Dump(str, cnt_block, value_st);
+          const_def->Dump(str, cnt_block, value_st);
+          break;
+        case 2:
+          const_def->Dump(str, cnt_block, value_st);
+          break;
+        default:
+          break;
+      }
+    }
+};
+
+// ConstDef ::= IDENT "=" ConstInitVal;
+class ConstDefAST : public BaseAST {
+  public:
+    std::unique_ptr<BaseAST> const_init_val;
+    std::string ident;
+
+    void Dump(char *str, int & cnt_block, std::stack<int>* value_st) const override {
+      const_init_val->Dump(str, cnt_block, value_st);
+    }
+};
+
+// ConstInitVal ::= ConstExp;
+class ConstInitValAST : public BaseAST {
+  public:
+    std::unique_ptr<BaseAST> const_exp;
+
+    void Dump(char *str, int & cnt_block, std::stack<int>* value_st) const override {
+      const_exp->Dump(str, cnt_block, value_st);
+    }
+};
+
 // FuncDef ::= FuncType IDENT "(" ")" Block;
 class FuncDefAST : public BaseAST {
   public:
@@ -57,17 +120,44 @@ class FuncTypeAST : public BaseAST {
     }
 };
 
-// Block ::= "{" Stmt "}";
+// Block ::= "{" BlockItemArr "}";
 class BlockAST : public BaseAST {
   public:
-    std::unique_ptr<BaseAST> stmt;
+    std::unique_ptr<BaseAST> block_item_arr;
 
     void Dump(char *str, int & cnt_block, std::stack<int>* value_st) const override {
       char stmp[10] = " {\n";
       strcat(str, stmp);
-      stmt->Dump(str, cnt_block, value_st);
+      block_item_arr->Dump(str, cnt_block, value_st);
       char stmp1[10] = "}\n";
       strcat(str, stmp1);
+    }
+};
+
+// BlockItemArr ::= BlockItemArr Decl | BlockItemArr Stmt | ;
+class BlockItemArrAST : public BaseAST {
+  public:
+    std::unique_ptr<BaseAST> block_item_arr;
+    std::unique_ptr<BaseAST> decl;
+    std::unique_ptr<BaseAST> stmt;
+    int mode;
+
+    void Dump(char *str, int & cnt_block, std::stack<int>* value_st) const override {
+      // std::cout << "blockitemarr dump mode = " << mode << std::endl;
+      switch (mode){
+        case 1:
+          block_item_arr->Dump(str, cnt_block, value_st);
+          decl->Dump(str, cnt_block, value_st);
+          break;
+        case 2:
+          block_item_arr->Dump(str, cnt_block, value_st);
+          stmt->Dump(str, cnt_block, value_st);
+          break;
+        case 3:
+          break;
+        default:
+          break;
+      }
     }
 };
 
@@ -104,18 +194,36 @@ class ExpAST : public BaseAST {
     }
 };
 
-// PrimaryExp ::= "(" Exp ")" | Number;
+// LVal ::= IDENT;
+class LValAST : public BaseAST {
+  public:
+    std::string ident;
+
+    void Dump(char *str, int & cnt_block, std::stack<int>* value_st) const override {
+      return;
+    }
+};
+
+// PrimaryExp ::= "(" Exp ")" | LVal | Number;
 class PrimaryExpAST : public BaseAST {
   public:
     std::unique_ptr<BaseAST> exp;
+    std::unique_ptr<BaseAST> lval;
     int number, mode;
 
     void Dump(char *str, int & cnt_block, std::stack<int>* value_st) const override {
-      if (mode == 1){
-        exp->Dump(str, cnt_block, value_st);
-      }
-      else{
-        (*value_st).push(number);
+      switch (mode){
+        case 1:
+          exp->Dump(str, cnt_block, value_st);
+          break;
+        case 2:
+          lval->Dump(str, cnt_block, value_st);
+          break;
+        case 3:
+          (*value_st).push(number);
+          break;
+        default:
+          break;
       }
     }
 };
@@ -647,5 +755,15 @@ class LOrExpAST : public BaseAST {
           break;
         default: break;
       }
+    }
+};
+
+// ConstExp ::= Exp;
+class ConstExpAST : public BaseAST {
+  public:
+    std::unique_ptr<BaseAST> exp;
+
+    void Dump(char *str, int & cnt_block, std::stack<int>* value_st) const override {
+      exp->Dump(str, cnt_block, value_st);
     }
 };

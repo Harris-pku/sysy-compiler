@@ -46,9 +46,10 @@ using namespace std;
 %type <ast_val> FuncDef FuncType Block Stmt
 %type <ast_val> Exp PrimaryExp UnaryExp MulExp AddExp
 %type <ast_val> RelExp EqExp LAndExp LOrExp
-// %type <ast_val> Decl ConstDecl BType ConstDef ConstInitVal ConstExp
-// %type <ast_val> VarDecl VarDef InitVal
-// %type <ast_val> LVal BlockItem FuncFParams FuncFParam
+%type <ast_val> Decl ConstDecl ConstDefArr ConstDef
+%type <ast_val> LVal BlockItemArr ConstInitVal ConstExp
+// %type <ast_val> VarDecl VarDefArr VarDef InitVal
+// %type <ast_val> FuncFParams FuncFParam
 %type <int_val> Number
 
 %%
@@ -63,6 +64,60 @@ CompUnit
     auto comp_unit = make_unique<CompUnitAST>();
     comp_unit->func_def = unique_ptr<BaseAST>($1);
     ast = move(comp_unit);
+  }
+  ;
+
+// Decl ::= ConstDecl;
+Decl
+  : ConstDecl {
+    auto ast = new DeclAST();
+    ast->const_decl = unique_ptr<BaseAST>($1);
+    $$ = ast;
+  }
+  ;
+
+// ConstDecl ::= CONST INT ConstDefArr ";";
+ConstDecl
+  : CONST INT ConstDefArr ';' {
+    auto ast = new ConstDeclAST();
+    ast->const_def_arr = unique_ptr<BaseAST>($3);
+    $$ = ast;
+  }
+  ;
+
+// ConstDefArr ::= ConstDefArr "," ConstDef | ConstDef;
+ConstDefArr
+  : ConstDefArr ',' ConstDef {
+    auto ast = new ConstDefArrAST();
+    ast->const_def_arr = unique_ptr<BaseAST>($1);
+    ast->const_def = unique_ptr<BaseAST>($3);
+    ast->mode = 1;
+    $$ = ast;
+  }
+  | ConstDef {
+    auto ast = new ConstDefArrAST();
+    ast->const_def = unique_ptr<BaseAST>($1);
+    ast->mode = 2;
+    $$ = ast;
+  }
+  ;
+
+// ConstDef ::= IDENT "=" ConstInitVal;
+ConstDef
+  : IDENT '=' ConstInitVal {
+    auto ast = new ConstDefAST();
+    ast->ident = *unique_ptr<string>($1);
+    ast->const_init_val = unique_ptr<BaseAST>($3);
+    $$ = ast;
+  }
+  ;
+
+// ConstInitVal ::= ConstExp;
+ConstInitVal
+  : ConstExp {
+    auto ast = new ConstInitValAST();
+    ast->const_exp = unique_ptr<BaseAST>($1);
+    $$ = ast;
   }
   ;
 
@@ -95,14 +150,37 @@ FuncType
   }
   ;
 
-// Block ::= "{" Stmt "}";
+// Block ::= "{" BlockItemArr "}";
 Block
-  : '{' Stmt '}' {
+  : '{' BlockItemArr '}' {
     auto ast = new BlockAST();
-    ast->stmt = unique_ptr<BaseAST>($2);
+    ast->block_item_arr = unique_ptr<BaseAST>($2);
     $$ = ast;
   }
   ;
+
+// BlockItemArr ::= BlockItemArr Decl | BlockItemArr Stmt | ;
+BlockItemArr
+  : BlockItemArr Decl {
+    auto ast = new BlockItemArrAST();
+    ast->block_item_arr = unique_ptr<BaseAST>($1);
+    ast->decl = unique_ptr<BaseAST>($2);
+    ast->mode = 1;
+    $$ = ast;
+  }
+  | BlockItemArr Stmt {
+    auto ast = new BlockItemArrAST();
+    ast->block_item_arr = unique_ptr<BaseAST>($1);
+    ast->stmt = unique_ptr<BaseAST>($2);
+    ast->mode = 2;
+    $$ = ast;
+  }
+  | {
+    auto ast = new BlockItemArrAST();
+    ast->mode = 3;
+    $$ = ast;
+  }
+  ; 
 
 // Stmt ::= "return" Exp ";";
 Stmt
@@ -122,7 +200,16 @@ Exp
   }
   ;
 
-// PrimaryExp ::= "(" Exp ")" | Number;
+// LVal ::= IDENT;
+LVal
+  : IDENT {
+    auto ast = new LValAST();
+    ast->ident = *unique_ptr<string>($1);
+    $$ = ast;
+  }
+  ;
+
+// PrimaryExp ::= "(" Exp ")" | LVal | Number;
 PrimaryExp
   : '(' Exp ')' {
     auto ast = new PrimaryExpAST();
@@ -130,10 +217,16 @@ PrimaryExp
     ast->mode = 1;
     $$ = ast;
   }
+  | LVal {
+    auto ast = new PrimaryExpAST();
+    ast->lval = unique_ptr<BaseAST>($1);
+    ast->mode = 2;
+    $$ = ast;
+  }
   | Number {
     auto ast = new PrimaryExpAST();
     ast->number = $1;
-    ast->mode = 2;
+    ast->mode = 3;
     $$ = ast;
   }
   ;
@@ -331,7 +424,16 @@ LOrExp
     ast->mode = 2;
     $$ = ast;
   }
+  ;
 
+// ConstExp ::= Exp;
+ConstExp
+  : Exp {
+    auto ast = new ConstExpAST();
+    ast->exp = unique_ptr<BaseAST>($1);
+    $$ = ast;
+  }
+  ;
 
 %%
 
