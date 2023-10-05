@@ -6,135 +6,243 @@
 #include <stack>
 #include <vector>
 #include <map>
-#include <sym.hpp>
+#include "sym.hpp"
 
 // 所有 AST 的基类
 class BaseAST {
   public:
     virtual ~BaseAST() = default;
-    virtual int Cal(std::map<std::string, sym_t>* val_ma) = 0;
-    virtual void Dump(char *str, int & cnt, std::stack<num_t>* val_st,
+    virtual int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) = 0;
+    virtual void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+                      std::stack<num_t>* val_st, int global,
                       std::map<std::string, sym_t>* val_ma) const = 0;
 };
 
-// CompUnit ::= FuncDef;
-class CompUnitAST : public BaseAST {
+// TreeHead ::= CompUnit
+class TreeHeadAST : public BaseAST {
   public:
-    std::unique_ptr<BaseAST> func_def;
+    std::unique_ptr<BaseAST> comp_unit;
 
-    int Cal(std::map<std::string, sym_t>* val_ma) override { return 0; }
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override { return 0; }
 
-    void Dump(char *str, int & cnt, std::stack<num_t>* val_st,
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
               std::map<std::string, sym_t>* val_ma) const override {
-      func_def->Dump(str, cnt, val_st, val_ma);
+      comp_unit->Dump(str, cnt, loop_cur, val_st, global, val_ma);
     }
 };
 
-// Decl ::= ConstDecl | VarDecl;
+// CompUnit ::= FuncDef | Decl | CompUnit FuncDef | CompUnit Decl
+class CompUnitAST : public BaseAST {
+  public:
+    std::unique_ptr<BaseAST> func_def;
+    std::unique_ptr<BaseAST> decl;
+    std::unique_ptr<BaseAST> comp_unit;
+    int mode;
+
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override { return 0; }
+
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
+              std::map<std::string, sym_t>* val_ma) const override {
+      switch (mode){
+        case 1:
+          func_def->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          break;
+        case 2:
+          decl->Dump(str, cnt, loop_cur, val_st, 1, val_ma);
+          break;
+        case 3:
+          comp_unit->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          func_def->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          break;
+        case 4:
+          comp_unit->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          decl->Dump(str, cnt, loop_cur, val_st, 1, val_ma);
+          break;
+        default:
+          assert(false);
+          break;
+      }
+    }
+};
+
+// Decl ::= ConstDecl | VarDecl
 class DeclAST : public BaseAST {
   public:
     std::unique_ptr<BaseAST> const_decl;
     std::unique_ptr<BaseAST> var_decl;
     int mode;
 
-    int Cal(std::map<std::string, sym_t>* val_ma) override { return 0; }
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override { return 0; }
 
-    void Dump(char *str, int & cnt, std::stack<num_t>* val_st,
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
               std::map<std::string, sym_t>* val_ma) const override {
       switch (mode){
         case 1:
-          const_decl->Dump(str, cnt, val_st, val_ma);
+          const_decl->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           break;
         case 2:
-          var_decl->Dump(str, cnt, val_st, val_ma);
+          var_decl->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           break;
         default:
+          assert(false);
           break;
       }
     }
 };
 
-// ConstDecl ::= CONST INT ConstDefArr ";";
+// ConstDecl ::= CONST INT ConstDefArr ";"
 class ConstDeclAST : public BaseAST {
   public:
     std::unique_ptr<BaseAST> const_def_arr;
 
-    int Cal(std::map<std::string, sym_t>* val_ma) override { return 0; }
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override { return 0; }
 
-    void Dump(char *str, int & cnt, std::stack<num_t>* val_st,
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
               std::map<std::string, sym_t>* val_ma) const override {
-      const_def_arr->Dump(str, cnt, val_st, val_ma);
+      const_def_arr->Dump(str, cnt, loop_cur, val_st, global, val_ma);
     }
 };
 
-// ConstDefArr ::= ConstDefArr "," ConstDef | ConstDef; 
+// ConstDefArr ::= ConstDefArr "," ConstDef | ConstDef
 class ConstDefArrAST : public BaseAST {
   public:
     std::unique_ptr<BaseAST> const_def_arr;
     std::unique_ptr<BaseAST> const_def;
     int mode;
 
-    int Cal(std::map<std::string, sym_t>* val_ma) override { return 0; }
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override { return 0; }
 
-    void Dump(char *str, int & cnt, std::stack<num_t>* val_st,
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
               std::map<std::string, sym_t>* val_ma) const override {
       switch (mode){
         case 1:
-          const_def_arr->Dump(str, cnt, val_st, val_ma);
-          const_def->Dump(str, cnt, val_st, val_ma);
+          const_def_arr->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          const_def->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           break;
         case 2:
-          const_def->Dump(str, cnt, val_st, val_ma);
+          const_def->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           break;
         default:
+          assert(false);
           break;
       }
     }
 };
 
-// ConstDef ::= IDENT "=" ConstInitVal;
+// ConstDef ::= IDENT "=" ConstInitVal
+//            | IDENT "[" ConstExp "]" "=" ConstInitVal
 class ConstDefAST : public BaseAST {
   public:
     std::unique_ptr<BaseAST> const_init_val;
+    std::unique_ptr<BaseAST> const_exp;
     std::string ident;
+    int mode;
 
-    int Cal(std::map<std::string, sym_t>* val_ma) override { return 0; }
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override { return 0; }
 
-    void Dump(char *str, int & cnt, std::stack<num_t>* val_st,
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
               std::map<std::string, sym_t>* val_ma) const override {
       sym_t sym;
-      sym.val_t = const_init_val->Cal(val_ma);
-      sym.type = 0;
-      (*val_ma)[ident] = sym;
+      switch (mode){
+        case 1:
+          sym.val_t = const_init_val->Cal(str, val_st, val_ma);
+          sym.type = 0;
+          (*val_ma)[ident] = sym;
+          break;
+        case 2:
+          break;
+        default:
+          assert(false);
+          break;
+      }
     }
 };
 
-// ConstInitVal ::= ConstExp;
+// ConstInitVal ::= ConstExp | "{" "}" | "{" ConstExpArr "}"
 class ConstInitValAST : public BaseAST {
   public:
     std::unique_ptr<BaseAST> const_exp;
+    std::unique_ptr<BaseAST> const_exp_arr;
+    int mode;
 
-    int Cal(std::map<std::string, sym_t>* val_ma) override {
-      int val = const_exp->Cal(val_ma);
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override {
+      int val = 0;
+      switch (mode){
+        case 1:
+          val = const_exp->Cal(str, val_st, val_ma);
+          break;
+        case 2:
+          break;
+        case 3:
+          break;
+        default:
+          assert(false);
+          break;
+      }
       return val;
     }
 
-    void Dump(char *str, int & cnt, std::stack<num_t>* val_st,
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
               std::map<std::string, sym_t>* val_ma) const override {
-      const_exp->Dump(str, cnt, val_st, val_ma);
+      switch (mode){
+        case 1:
+          const_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          break;
+        case 2:
+          break;
+        case 3:
+          break;
+        default:
+          assert(false);
+          break;
+      }
     }
 };
 
-// VarDecl ::= INT VarDefArr ";";
+// ConstExpArr ::= ConstExp | ConstExpArr "," ConstExp
+class ConstExpArrAST : public BaseAST {
+  public:
+    std::unique_ptr<BaseAST> const_exp;
+    std::unique_ptr<BaseAST> const_exp_arr;
+    int mode;
+
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override { return 0; }
+
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
+              std::map<std::string, sym_t>* val_ma) const override {
+      switch (mode){
+        case 1:
+          const_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          break;
+        case 2:
+          const_exp_arr->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          const_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          break;
+        default:
+          assert(false);
+      }
+    }
+};
+
+// VarDecl ::= INT VarDefArr ";"
 class VarDeclAST : public BaseAST {
   public:
     std::unique_ptr<BaseAST> var_def_arr;
 
-    int Cal(std::map<std::string, sym_t>* val_ma) override { return 0; }
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override { return 0; }
 
-    void Dump(char *str, int & cnt, std::stack<num_t>* val_st,
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
               std::map<std::string, sym_t>* val_ma) const override {
-      var_def_arr->Dump(str, cnt, val_st, val_ma);
+      var_def_arr->Dump(str, cnt, loop_cur, val_st, global, val_ma);
     }
 };
 
@@ -145,135 +253,343 @@ class VarDefArrAST : public BaseAST {
     std::unique_ptr<BaseAST> var_def;
     int mode;
 
-    int Cal(std::map<std::string, sym_t>* val_ma) override { return 0; }
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override { return 0; }
 
-    void Dump(char *str, int & cnt, std::stack<num_t>* val_st,
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
               std::map<std::string, sym_t>* val_ma) const override {
       switch (mode){
         case 1:
-          var_def_arr->Dump(str, cnt, val_st, val_ma);
-          var_def->Dump(str, cnt, val_st, val_ma);
+          var_def_arr->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          var_def->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           break;
         case 2:
-          var_def->Dump(str, cnt, val_st, val_ma);
+          var_def->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           break;
         default:
+          assert(false);
           break;
       }
     }
 };
 
-// VarDef ::= IDENT | IDENT "=" InitVal;
+// VarDef ::= IDENT | IDENT "[" ConstExp "]"
+//          | IDENT "=" InitVal | IDENT "[" ConstExp "]" "=" InitVal
 class VarDefAST : public BaseAST {
   public:
     std::unique_ptr<BaseAST> init_val;
+    std::unique_ptr<BaseAST> const_exp;
     std::string ident;
     int mode;
 
-    int Cal(std::map<std::string, sym_t>* val_ma) override { return 0; }
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override { return 0; }
 
-    void Dump(char *str, int & cnt, std::stack<num_t>* val_st,
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
               std::map<std::string, sym_t>* val_ma) const override {
       char stmp[50];
+      int tmpval;
       sym_t sym;
+      num_t tmpnum;
       switch (mode){
         case 1:
           sym.val_t = 0;
           sym.type = 1;
           (*val_ma)[ident] = sym;
-          sprintf(stmp, "  @%s = alloc i32\n", ident.c_str());
-          strcat(str, stmp);
-          sprintf(stmp, "  store 0, @%s\n\n", ident.c_str());
-          strcat(str, stmp);
+          if (global == 0){
+            sprintf(stmp, "  @%s = alloc i32\n", ident.c_str());
+            strcat(str, stmp);
+            sprintf(stmp, "  store 0, @%s\n", ident.c_str());
+            strcat(str, stmp);
+          }
+          else{
+            sprintf(stmp, "global @%s = alloc i32, 0\n\n", ident.c_str());
+            strcat(str, stmp);
+          }
           break;
         case 2:
-          sym.val_t = init_val->Cal(val_ma);
-          sym.type = 1;
-          (*val_ma)[ident] = sym;
-          sprintf(stmp, "  @%s = alloc i32\n", ident.c_str());
-          strcat(str, stmp);
-          sprintf(stmp, "  store %d, @%s\n\n", sym.val_t, ident.c_str());
-          strcat(str, stmp);
+          break;
+        case 3:
+          if (global == 0){
+            init_val->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+            tmpnum = (*val_st).top();
+            (*val_st).pop();
+            sprintf(stmp, "  @%s = alloc i32\n", ident.c_str());
+            strcat(str, stmp);
+            if (tmpnum.valid == 1){
+              sym.val_t = tmpnum.num_val;
+              sprintf(stmp, "  store %d, @%s\n", sym.val_t, ident.c_str());
+              strcat(str, stmp);
+            }
+            else{
+              sym.val_t = 0;
+              sprintf(stmp, "  store %%%d, @%s\n", tmpnum.num_val, ident.c_str());
+              strcat(str, stmp);
+            }
+            sym.type = 1;
+            (*val_ma)[ident] = sym;
+          }
+          else{
+            tmpval = init_val->Cal(str, val_st, val_ma);
+            sprintf(stmp, "global @%s = alloc i32, %d\n\n", ident.c_str(), tmpval);
+            strcat(str, stmp);
+            sym.val_t = tmpval;
+            sym.type = 1;
+            (*val_ma)[ident] = sym;
+          }
+          break;
+        case 4:
           break;
         default:
+          assert(false);
           break;
       }
     }
 };
 
-// InitVal ::= Exp;
+// InitVal ::= Exp | "{" "}" | "{" ExpArr "}"
 class InitValAST : public BaseAST {
   public:
     std::unique_ptr<BaseAST> exp;
+    std::unique_ptr<BaseAST> exp_arr;
+    int mode;
 
-    int Cal(std::map<std::string, sym_t>* val_ma) override {
-      int val = exp->Cal(val_ma);
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override {
+      int val = 0;
+      switch (mode){
+        case 1:
+          val = exp->Cal(str, val_st, val_ma);
+          break;
+        case 2:
+          break;
+        case 3:
+          break;
+        default:
+          assert(false);
+      }
       return val;
     }
 
-    void Dump(char *str, int & cnt, std::stack<num_t>* val_st,
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
               std::map<std::string, sym_t>* val_ma) const override {
-      exp->Dump(str, cnt, val_st, val_ma);
-    }
-};
-
-// FuncDef ::= FuncType IDENT "(" ")" Block;
-class FuncDefAST : public BaseAST {
-  public:
-    std::unique_ptr<BaseAST> func_type;
-    std::string ident;
-    std::unique_ptr<BaseAST> block;
-
-    int Cal(std::map<std::string, sym_t>* val_ma) override { return 0; }
-
-    void Dump(char *str, int & cnt, std::stack<num_t>* val_st,
-              std::map<std::string, sym_t>* val_ma) const override {
-      char stmp[20] = "fun @";
-      strcat(stmp, ident.c_str());
-      char stmp1[10] = "(): ";
-      strcat(stmp, stmp1);
-      strcat(str, stmp);
-      func_type->Dump(str, cnt, val_st, val_ma);
-      block->Dump(str, cnt, val_st, val_ma);
-    }
-};
-
-// FuncType ::= "int";
-class FuncTypeAST : public BaseAST {
-  public:
-    std::string type;
-
-    int Cal(std::map<std::string, sym_t>* val_ma) override { return 0; }
-
-    void Dump(char *str, int & cnt, std::stack<num_t>* val_st,
-              std::map<std::string, sym_t>* val_ma) const override {
-      if (type == "int"){
-        char stmp[10] = "i32";
-        strcat(str, stmp);
+      switch (mode){
+        case 1:
+          exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          break;
+        case 2:
+          break;
+        case 3:
+          exp_arr->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          break;
+        default:
+          assert(false);
+          break;
       }
     }
 };
 
-// Block ::= "{" BlockItemArr "}";
+// ExpArr ::= Exp | ExpArr "," Exp
+class ExpArrAST : public BaseAST {
+  public:
+    std::unique_ptr<BaseAST> exp;
+    std::unique_ptr<BaseAST> exp_arr;
+    int mode;
+
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override { return 0; }
+
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
+              std::map<std::string, sym_t>* val_ma) const override {
+      switch (mode){
+        case 1:
+          exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          break;
+        case 2:
+          exp_arr->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          break;
+        default:
+          assert(false);
+      }
+    }
+};
+
+// FuncDef ::= INT IDENT "(" ")" Block
+//           | VOID IDENT "(" ")" Block
+//           | INT IDENT "(" FuncFParamArr ")" Block
+//           | VOID IDENT "(" FuncFParamArr ")" Block
+class FuncDefAST : public BaseAST {
+  public:
+    std::string ident;
+    std::unique_ptr<BaseAST> block;
+    std::unique_ptr<BaseAST> func_fparam_arr;
+    int mode;
+
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override { return 0; }
+
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
+              std::map<std::string, sym_t>* val_ma) const override {
+      char stmp[50];
+      sym_t loop_sym;
+      switch (mode){
+        case 1:
+          sprintf(stmp, "fun @%s(): i32 {\n", ident.c_str());
+          strcat(str, stmp);
+          sprintf(stmp, "%%entry:\n");
+          strcat(str, stmp);
+          loop_sym.type = 2;
+          loop_sym.val_t = 0;
+          (*val_ma)[ident] = loop_sym;
+          block->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          sprintf(stmp, "}\n\n");
+          strcat(str, stmp);
+          break;
+        case 2:
+          sprintf(stmp, "fun @%s() {\n", ident.c_str());
+          strcat(str, stmp);  
+          sprintf(stmp, "%%entry:\n");
+          strcat(str, stmp);
+          loop_sym.type = 3;
+          loop_sym.val_t = 0;
+          (*val_ma)[ident] = loop_sym;
+          block->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          if (block->Cal(str, val_st, val_ma) == 3){
+            sprintf(stmp, "  ret\n");
+            strcat(str, stmp);
+          }
+          sprintf(stmp, "}\n\n");
+          strcat(str, stmp);
+          break;
+        case 3:
+          sprintf(stmp, "fun @%s(", ident.c_str());
+          strcat(str, stmp);
+          loop_sym.type = 2;
+          loop_sym.val_t = 0;
+          (*val_ma)[ident] = loop_sym;
+          func_fparam_arr->Cal(str, val_st, val_ma);
+          sprintf(stmp, "): i32 {\n%%entry:\n");
+          strcat(str, stmp);
+          func_fparam_arr->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          block->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          sprintf(stmp, "}\n\n");
+          strcat(str, stmp);
+          break;
+        case 4:
+          sprintf(stmp, "fun @%s(", ident.c_str());
+          strcat(str, stmp);
+          loop_sym.type = 3;
+          loop_sym.val_t = 0;
+          (*val_ma)[ident] = loop_sym;
+          func_fparam_arr->Cal(str, val_st, val_ma);
+          sprintf(stmp, ") {\n%%entry:\n");
+          strcat(str, stmp);
+          func_fparam_arr->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          block->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          if (block->Cal(str, val_st, val_ma) == 3){
+            sprintf(stmp, "  ret\n");
+            strcat(str, stmp);
+          }
+          sprintf(stmp, "}\n\n");
+          strcat(str, stmp);
+          break;
+        default:
+          assert(false);
+          break;
+      }
+    }
+};
+
+// FuncFParamArr ::= FuncFParamArr "," FuncFParam | FuncFParam
+class FuncFParamArrAST : public BaseAST {
+  public:
+    std::unique_ptr<BaseAST> func_fparam_arr;
+    std::unique_ptr<BaseAST> func_fparam;
+    int mode;
+
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override {
+      char stmp[20];
+      switch (mode){
+        case 1:
+          func_fparam_arr->Cal(str, val_st, val_ma);
+          sprintf(stmp, ", ");
+          strcat(str, stmp);
+          func_fparam->Cal(str, val_st, val_ma);
+          break;
+        case 2:
+          func_fparam->Cal(str, val_st, val_ma);
+          break;
+        default:
+          assert(false);
+          break;
+      }
+      return 0;
+    }
+
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
+              std::map<std::string, sym_t>* val_ma) const override {
+      switch (mode){
+        case 1:
+          func_fparam_arr->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          func_fparam->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          break;
+        case 2:
+          func_fparam->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          break;
+        default:
+          assert(false);
+          break;
+      }
+    }
+};
+
+// FuncFParam ::= INT IDENT
+class FuncFParamAST : public BaseAST {
+  public:
+    std::string ident;
+
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override {
+      char stmp[50];
+      sprintf(stmp, "@%s: i32", ident.c_str());
+      strcat(str, stmp);
+      return 0;
+    }
+
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
+              std::map<std::string, sym_t>* val_ma) const override {
+      char stmp[50];
+      sprintf(stmp, "  %%%s = alloc i32\n", ident.c_str());
+      strcat(str, stmp);
+      sprintf(stmp, "  store @%s, %%%s\n", ident.c_str(), ident.c_str());
+      strcat(str, stmp);
+      sym_t tmp_sym;
+      tmp_sym.type = 5;
+      tmp_sym.val_t = 0;
+      (*val_ma)[ident] = tmp_sym;
+    }
+};
+
+// Block ::= "{" BlockItemArr "}"
 class BlockAST : public BaseAST {
   public:
     std::unique_ptr<BaseAST> block_item_arr;
 
-    int Cal(std::map<std::string, sym_t>* val_ma) override { return 0; }
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override {
+      int val = block_item_arr->Cal(str, val_st, val_ma);
+      return val;
+    }
 
-    void Dump(char *str, int & cnt, std::stack<num_t>* val_st,
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
               std::map<std::string, sym_t>* val_ma) const override {
-      char stmp[10] = " {\n";
-      strcat(str, stmp);
-      char stmp1[20] = "%entry:\n";
-      strcat(str, stmp1);
-      block_item_arr->Dump(str, cnt, val_st, val_ma);
-      char stmp2[10] = "}\n";
-      strcat(str, stmp2);
+      block_item_arr->Dump(str, cnt, loop_cur, val_st, global, val_ma);
     }
 };
 
-// BlockItemArr ::= BlockItemArr Decl | BlockItemArr Stmt | ;
+// BlockItemArr ::= BlockItemArr Decl | BlockItemArr Stmt | 
 class BlockItemArrAST : public BaseAST {
   public:
     std::unique_ptr<BaseAST> block_item_arr;
@@ -281,23 +597,28 @@ class BlockItemArrAST : public BaseAST {
     std::unique_ptr<BaseAST> stmt;
     int mode;
 
-    int Cal(std::map<std::string, sym_t>* val_ma) override { return 0; }
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override {
+      int val = mode;
+      return val;
+    }
 
-    void Dump(char *str, int & cnt, std::stack<num_t>* val_st,
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
               std::map<std::string, sym_t>* val_ma) const override {
       // std::cout << "blockitemarr dump mode = " << mode << std::endl;
       switch (mode){
         case 1:
-          block_item_arr->Dump(str, cnt, val_st, val_ma);
-          decl->Dump(str, cnt, val_st, val_ma);
+          block_item_arr->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          decl->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           break;
         case 2:
-          block_item_arr->Dump(str, cnt, val_st, val_ma);
-          stmt->Dump(str, cnt, val_st, val_ma);
+          block_item_arr->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          stmt->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           break;
         case 3:
           break;
         default:
+          assert(false);
           break;
       }
     }
@@ -313,7 +634,7 @@ class BlockItemArrAST : public BaseAST {
 //        | BREAK ";"
 //        | CONTINUE ";"
 //        | RETURN ";"
-//        | RETURN Exp ";";
+//        | RETURN Exp ";"
 class StmtAST : public BaseAST {
   public:
     // std::unique_ptr<BaseAST> lval;
@@ -324,61 +645,182 @@ class StmtAST : public BaseAST {
     std::unique_ptr<BaseAST> else_stmt;
     int mode;
 
-    int Cal(std::map<std::string, sym_t>* val_ma) override { return 0; }
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override { return mode; }
 
-    void Dump(char *str, int & cnt, std::stack<num_t>* val_st,
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
               std::map<std::string, sym_t>* val_ma) const override {
-      char stmp[20];
+      char stmp[50];
       num_t tmpnum;
-      int ret_value;
+      sym_t tmpsym;
+      int ret_value, value, cur, tmpval;
       switch (mode){
         case 1:
-          sprintf(stmp, "  %%%d = load @%s\n", cnt+1, ident.c_str());
-          cnt++;
-          strcat(str, stmp);
-          exp->Dump(str, cnt, val_st, val_ma);
-          tmpnum = (*val_st).top();
-          (*val_st).pop();
-          ret_value = tmpnum.num_val;
-          if (tmpnum.valid == 1){
-            sprintf(stmp, "  %%%d = add 0, %d\n", cnt+1, ret_value);
-            strcat(str, stmp);
+          tmpsym = (*val_ma)[ident];
+          if (tmpsym.type == 1){
+            sprintf(stmp, "  %%%d = load @%s\n", cnt+1, ident.c_str());
             cnt++;
+            strcat(str, stmp);
+            exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+            tmpnum = (*val_st).top();
+            (*val_st).pop();
+            ret_value = tmpnum.num_val;
+            if (tmpnum.valid == 1){
+              sprintf(stmp, "  %%%d = add 0, %d\n", cnt+1, ret_value);
+              strcat(str, stmp);
+              cnt++;
+            }
+            sprintf(stmp, "  store %%%d, @%s\n", cnt, ident.c_str());
+            strcat(str, stmp);
           }
-          sprintf(stmp, "  store %%%d, @%s\n\n", cnt, ident.c_str());
-          strcat(str, stmp);
+          else{
+            sprintf(stmp, "  %%%d = load %%%s\n", cnt+1, ident.c_str());
+            cnt++;
+            strcat(str, stmp);
+            exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+            tmpnum = (*val_st).top();
+            (*val_st).pop();
+            ret_value = tmpnum.num_val;
+            if (tmpnum.valid == 1){
+              sprintf(stmp, "  %%%d = add 0, %d\n", cnt+1, ret_value);
+              strcat(str, stmp);
+              cnt++;
+            }
+            sprintf(stmp, "  store %%%d, @%s\n", cnt, ident.c_str());
+            strcat(str, stmp);
+          }
           break;
         case 2:
           break;
         case 3:
-          exp->Dump(str, cnt, val_st, val_ma);
+          exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           break;
         case 4:
-          block->Dump(str, cnt, val_st, val_ma);
+          block->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           break;
         case 5:
-          exp->Dump(str, cnt, val_st, val_ma);
-          stmt->Dump(str, cnt, val_st, val_ma);
-          else_stmt->Dump(str, cnt, val_st, val_ma);
+          exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          tmpnum = (*val_st).top();
+          value = tmpnum.num_val;
+          (*val_st).pop();
+          cur = std::max(cnt, 0);
+          if (tmpnum.valid == 1){
+            sprintf(stmp, "  br %d, %%then%d, %%next%d\n\n", value, cur, cur);
+          }
+          else{
+            sprintf(stmp, "  br %%%d, %%then%d, %%next%d\n\n", value, cur, cur);
+          }
+          strcat(str, stmp);
+
+          sprintf(stmp, "%%then%d:\n", cur);
+          strcat(str, stmp);
+          stmt->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          if (stmt->Cal(str, val_st, val_ma) != 11){
+            sprintf(stmp, "  jump %%next%d\n\n", cur);
+          }
+          else{
+            sprintf(stmp, "\n");
+          }
+          strcat(str, stmp);
+
+          sprintf(stmp, "%%next%d:\n", cur);
+          strcat(str, stmp);
           break;
         case 6:
-          exp->Dump(str, cnt, val_st, val_ma);
-          stmt->Dump(str, cnt, val_st, val_ma);
+          exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          tmpnum = (*val_st).top();
+          value = tmpnum.num_val;
+          (*val_st).pop();
+          cur = std::max(cnt, 0);
+          if (tmpnum.valid == 1){
+            sprintf(stmp, "  br %d, %%then%d, %%else%d\n\n", value, cur, cur);
+          }
+          else{
+            sprintf(stmp, "  br %%%d, %%then%d, %%else%d\n\n", value, cur, cur);
+          }
+          strcat(str, stmp);
+
+          sprintf(stmp, "%%then%d:\n", cur);
+          strcat(str, stmp);
+          stmt->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          if (stmt->Cal(str, val_st, val_ma) != 11){
+            sprintf(stmp, "  jump %%next%d\n\n", cur);
+          }
+          else{
+            sprintf(stmp, "\n");
+          }
+          strcat(str, stmp);
+
+          sprintf(stmp, "%%else%d:\n", cur);
+          strcat(str, stmp);
+          else_stmt->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          if (else_stmt->Cal(str, val_st, val_ma) != 11){
+            sprintf(stmp, "  jump %%next%d\n\n", cur);
+          }
+          else{
+            sprintf(stmp, "\n");
+          }
+          strcat(str, stmp);
+
+          sprintf(stmp, "%%next%d:\n", cur);
+          strcat(str, stmp);
           break;
         case 7:
-          exp->Dump(str, cnt, val_st, val_ma);
-          stmt->Dump(str, cnt, val_st, val_ma);
+          cur = std::max(cnt, 0);
+          (*loop_cur).push(cur);
+          sprintf(stmp, "  jump %%while_entry%d\n\n", cur);
+          strcat(str, stmp);
+
+          sprintf(stmp, "%%while_entry%d:\n", cur);
+          strcat(str, stmp);
+          exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          tmpnum = (*val_st).top();
+          value = tmpnum.num_val;
+          (*val_st).pop();
+          if (tmpnum.valid == 1){
+            sprintf(stmp, "  br %d, %%while_body%d, %%next%d\n\n", value, cur, cur);
+          }
+          else{
+            sprintf(stmp, "  br %%%d, %%while_body%d, %%next%d\n\n", value, cur, cur);
+          }
+          strcat(str, stmp);
+
+          sprintf(stmp, "%%while_body%d:\n", cur);
+          strcat(str, stmp);
+          stmt->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          tmpval = stmt->Cal(str, val_st, val_ma);
+          if (tmpval != 11){
+            sprintf(stmp, "  jump %%while_entry%d\n\n", cur);
+          }
+          else{
+            sprintf(stmp, "\n");
+          }
+          strcat(str, stmp);
+
+          sprintf(stmp, "%%next%d:\n", cur);
+          strcat(str, stmp);
+          (*loop_cur).pop();
           break;
         case 8:
+          cur = (*loop_cur).top();
+          sprintf(stmp, "  jump %%next%d\n\n", cur);
+          strcat(str, stmp);
+          sprintf(stmp, "%%while_body_%d:\n", cur);
+          strcat(str, stmp);
           break;
         case 9:
+          cur = (*loop_cur).top();
+          sprintf(stmp, "  jump %%while_entry%d\n\n", cur);
+          strcat(str, stmp);
+          sprintf(stmp, "%%while_body_%d:\n", cur);
+          strcat(str, stmp);
           break;
         case 10:
           sprintf(stmp, "  ret\n");
           strcat(str, stmp);
           break;
         case 11:
-          exp->Dump(str, cnt, val_st, val_ma);
+          exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           tmpnum = (*val_st).top();
           ret_value = tmpnum.num_val;
           (*val_st).pop();
@@ -397,53 +839,84 @@ class StmtAST : public BaseAST {
     }
 };
 
-// Exp ::= LorExp;
+// Exp ::= LorExp
 class ExpAST : public BaseAST {
   public:
     std::unique_ptr<BaseAST> lor_exp;
 
-    int Cal(std::map<std::string, sym_t>* val_ma) override {
-      int val = lor_exp->Cal(val_ma);
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override {
+      int val = lor_exp->Cal(str, val_st, val_ma);
       return val;
     }
 
-    void Dump(char *str, int & cnt, std::stack<num_t>* val_st,
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
               std::map<std::string, sym_t>* val_ma) const override {
-      lor_exp->Dump(str, cnt, val_st, val_ma);
+      lor_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
     }
 };
 
-// LVal ::= IDENT;
+// LVal ::= IDENT | IDENT "[" Exp "]"
 class LValAST : public BaseAST {
   public:
     std::string ident;
+    std::unique_ptr<BaseAST> exp;
+    int mode;
 
-    int Cal(std::map<std::string, sym_t>* val_ma) override {
-      assert((*val_ma).count(ident) == 1);
-      sym_t sym = (*val_ma)[ident];
-      return sym.val_t;
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override {
+      int val = 0;
+      sym_t sym;
+      switch (mode){
+        case 1:
+          assert((*val_ma).count(ident) == 1);
+          sym = (*val_ma)[ident];
+          val = sym.val_t;
+          break;
+        case 2:
+          break;
+        default:
+          break;
+      }
+      return val;
     }
 
-    void Dump(char *str, int & cnt, std::stack<num_t>* val_st,
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
               std::map<std::string, sym_t>* val_ma) const override {
-      if ((*val_ma).count(ident) == 1){
-        sym_t sym = (*val_ma)[ident];
-        if (sym.type == 0){
-          num_t tmpnum;
-          tmpnum.num_val = sym.val_t;
-          tmpnum.valid = 1;
-          (*val_st).push(tmpnum);
-        }
-        else{
-          char stmp[20];
-          sprintf(stmp, "  %%%d = load @%s\n", cnt+1, ident.c_str());
-          cnt++;
-          strcat(str, stmp);
-          num_t tmpnum;
-          tmpnum.num_val = cnt;
-          tmpnum.valid = 0;
-          (*val_st).push(tmpnum);
-        }
+      char stmp[20];
+      num_t tmpnum;
+      switch (mode){
+        case 1:
+          if ((*val_ma).count(ident) == 1){
+            sym_t sym = (*val_ma)[ident];
+            if (sym.type == 0){
+              tmpnum.num_val = sym.val_t;
+              tmpnum.valid = 1;
+              (*val_st).push(tmpnum);
+            }
+            else if (sym.type == 1){
+              sprintf(stmp, "  %%%d = load @%s\n", cnt+1, ident.c_str());
+              cnt++;
+              strcat(str, stmp);
+              tmpnum.num_val = cnt;
+              tmpnum.valid = 0;
+              (*val_st).push(tmpnum);
+            }
+            else{
+              sprintf(stmp, "  %%%d = load %%%s\n", cnt+1, ident.c_str());
+              cnt++;
+              strcat(str, stmp);
+              tmpnum.num_val = cnt;
+              tmpnum.valid = 0;
+              (*val_st).push(tmpnum);
+           }
+          }
+          break;
+        case 2:
+          break;
+        default:
+          assert(false);
+          break;
       }
     }
 };
@@ -455,32 +928,34 @@ class PrimaryExpAST : public BaseAST {
     std::unique_ptr<BaseAST> lval;
     int number, mode;
 
-    int Cal(std::map<std::string, sym_t>* val_ma) override {
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override {
       int val = 0;
       switch (mode){
         case 1:
-          val = exp->Cal(val_ma);
+          val = exp->Cal(str, val_st, val_ma);
           break;
         case 2:
-          val = lval->Cal(val_ma);
+          val = lval->Cal(str, val_st, val_ma);
           break;
         case 3:
           val = number;
           break;
         default:
+          assert(false);
           break;
       }
       return val;
     }
 
-    void Dump(char *str, int & cnt, std::stack<num_t>* val_st,
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
               std::map<std::string, sym_t>* val_ma) const override {
       switch (mode){
         case 1:
-          exp->Dump(str, cnt, val_st, val_ma);
+          exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           break;
         case 2:
-          lval->Dump(str, cnt, val_st, val_ma);
+          lval->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           break;
         case 3:
           num_t tmpnum;
@@ -489,6 +964,7 @@ class PrimaryExpAST : public BaseAST {
           (*val_st).push(tmpnum);
           break;
         default:
+          assert(false);
           break;
       }
     }
@@ -498,103 +974,224 @@ class PrimaryExpAST : public BaseAST {
 class NumberAST : public BaseAST {
   public:
     int num;
-    int Cal(std::map<std::string, sym_t>* val_ma) override {
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override {
       return num;
     }
 
-    void Dump(char *str, int & cnt, std::stack<num_t>* val_st,
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
               std::map<std::string, sym_t>* val_ma) const override {
       num_t tmpnum;
       tmpnum.num_val = num;
       tmpnum.valid = 1;
       (*val_st).push(tmpnum);
-
     }
 };
 
-// UnaryExp ::= PrimaryExp | ("+" | "-" | "!") UnaryExp;
+// UnaryExp ::= PrimaryExp
+//            | IDENT "(" ")"
+//            | IDENT "(" FuncRParamArr ")"
+//            | ("+" | "-" | "!") UnaryExp;
 class UnaryExpAST : public BaseAST {
   public:
     std::unique_ptr<BaseAST> primary_exp;
+    std::string ident;
+    std::unique_ptr<BaseAST> func_rparam_arr;
     std::unique_ptr<BaseAST> unary_exp;
     int mode;
 
-    int Cal(std::map<std::string, sym_t>* val_ma) override {
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override {
       int val = 0;
       switch (mode){
         case 1:
-          val = primary_exp->Cal(val_ma);
+          val = primary_exp->Cal(str, val_st, val_ma);
           break;
         case 2:
-          val = unary_exp->Cal(val_ma);
           break;
         case 3:
-          val = unary_exp->Cal(val_ma);
-          val = -val;
           break;
         case 4:
-          val = unary_exp->Cal(val_ma);
+          val = unary_exp->Cal(str, val_st, val_ma);
+          break;
+        case 5:
+          val = unary_exp->Cal(str, val_st, val_ma);
+          val = -val;
+          break;
+        case 6:
+          val = unary_exp->Cal(str, val_st, val_ma);
           val = !val;
           break;
         default:
+          assert(false);
           break;
       }
       return val;
     }
 
-    void Dump(char *str, int & cnt, std::stack<num_t>* val_st,
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
               std::map<std::string, sym_t>* val_ma) const override {
-      if (mode == 1){
-        primary_exp->Dump(str, cnt, val_st, val_ma);
+        
+      char stmp[50];
+      num_t tmpnum;
+      sym_t tmp_loop;
+      int value;
+      switch (mode){
+        case 1:
+          primary_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          break;
+        case 2:
+          tmp_loop = (*val_ma)[ident];
+          if (tmp_loop.type == 2){
+            sprintf(stmp, "  %%%d = call @%s()\n", cnt+1, ident.c_str());
+            cnt++;
+            tmpnum.num_val = cnt;
+            tmpnum.valid = 0;
+            (*val_st).push(tmpnum);
+          }
+          else if (tmp_loop.type == 3){
+            sprintf(stmp, "  call @%s()\n", ident.c_str());
+          }
+          strcat(str, stmp);
+          break;
+        case 3:
+          tmp_loop = (*val_ma)[ident];
+          if (tmp_loop.type == 2){
+            func_rparam_arr->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+            sprintf(stmp, "  %%%d = call @%s(", cnt+1, ident.c_str());
+            strcat(str, stmp);
+            cnt++;
+            func_rparam_arr->Cal(str, val_st, val_ma);
+            sprintf(stmp, ")\n");
+            tmpnum.num_val = cnt;
+            tmpnum.valid = 0;
+            (*val_st).push(tmpnum);
+          }
+          else if (tmp_loop.type == 3){
+            func_rparam_arr->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+            sprintf(stmp, "  call @%s(", ident.c_str());
+            strcat(str, stmp);
+            func_rparam_arr->Cal(str, val_st, val_ma);
+            sprintf(stmp, ")\n");
+          }
+          strcat(str, stmp);
+          break;
+        case 4:
+          unary_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          break;
+        case 5:
+          // std::cout << "unary_exp dump5" << std::endl;
+          unary_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          tmpnum = (*val_st).top();
+          value = tmpnum.num_val;
+          (*val_st).pop();
+          if (tmpnum.valid == 1){
+            sprintf(stmp, "  %%%d = sub 0, %d\n", cnt+1, value);
+          }
+          else{
+            sprintf(stmp, "  %%%d = sub 0, %%%d\n", cnt+1, value);
+          }
+          cnt++;
+          strcat(str, stmp);
+          tmpnum.valid = 0;
+          tmpnum.num_val = cnt;
+          (*val_st).push(tmpnum);
+          break;
+        case 6:
+          // std::cout << "unary_exp dump6" << std::endl;
+          unary_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          tmpnum = (*val_st).top();
+          value = tmpnum.num_val;
+          (*val_st).pop();
+          if (tmpnum.valid == 1){
+            sprintf(stmp, "  %%%d = eq %d, 0\n", cnt+1, value);
+          }
+          else{
+            sprintf(stmp, "  %%%d = eq %%%d, 0\n", cnt+1, value);
+          }
+          cnt++;
+          strcat(str, stmp);
+          tmpnum.valid = 0;
+          tmpnum.num_val = cnt;
+          (*val_st).push(tmpnum);
+          break;
+        default:
+          assert(false);
+          break;
+      }
+    }
+};
+
+// FuncRParamArr ::= FuncRParamArr "," FuncRParam | FuncRParam;
+class FuncRParamArrAST : public BaseAST {
+  public:
+    std::unique_ptr<BaseAST> func_rparam_arr;
+    std::unique_ptr<BaseAST> func_rparam;
+    int mode;
+
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override {
+      char stmp[20];
+      switch (mode){
+        case 1:
+          // std::cout << "func_rparam_arr cal1" << std::endl;
+          func_rparam_arr->Cal(str, val_st, val_ma);
+          sprintf(stmp, ", ");
+          strcat(str, stmp);
+          func_rparam->Cal(str, val_st, val_ma);
+          break;
+        case 2:
+          // std::cout << "func_rparam_arr cal2" << std::endl;
+          func_rparam->Cal(str, val_st, val_ma);
+          break;
+        default:
+          assert(false);
+          break;
+      }
+      return 0;
+    }
+
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
+              std::map<std::string, sym_t>* val_ma) const override {
+      switch (mode){
+        case 1:
+          func_rparam->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          func_rparam_arr->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          break;
+        case 2:
+          func_rparam->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          break;
+        default:
+          assert(false);
+          break;
+      }
+    }
+};
+
+// FuncRParam ::= Exp;
+class FuncRParamAST : public BaseAST {
+  public:
+    std::unique_ptr<BaseAST> exp;
+
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override {
+      num_t tmpnum= (*val_st).top();
+      int value = tmpnum.num_val;
+      (*val_st).pop();
+      char stmp[20];
+      if (tmpnum.valid == 1){
+        sprintf(stmp, "%d", value);
       }
       else{
-        unary_exp->Dump(str, cnt, val_st, val_ma);
-        char stmp[20];
-        num_t tmpnum;
-        int value;
-        // std::cout << "mode == " << mode << std::endl;
-        switch (mode){
-          case 2:
-            break;
-          case 3:
-            tmpnum = (*val_st).top();
-            value = tmpnum.num_val;
-            (*val_st).pop();
-            if (tmpnum.valid == 1){
-              sprintf(stmp, "  %%%d = sub 0, %d\n", cnt+1, value);
-            }
-            else{
-              sprintf(stmp, "  %%%d = sub 0, %%%d\n", cnt+1, value);
-            }
-            // std::cout << "unary_exp dump3" << std::endl;
-            cnt++;
-            strcat(str, stmp);
-            tmpnum.valid = 0;
-            tmpnum.num_val = cnt;
-            (*val_st).push(tmpnum);
-            break;
-          case 4:
-            tmpnum = (*val_st).top();
-            value = tmpnum.num_val;
-            (*val_st).pop();
-            if (tmpnum.valid == 1){
-              sprintf(stmp, "  %%%d = eq %d, 0\n", cnt+1, value);
-            }
-            else{
-              sprintf(stmp, "  %%%d = eq %%%d, 0\n", cnt+1, value);
-            }
-            // std::cout << "unary_exp dump4" << std::endl;
-            cnt++;
-            strcat(str, stmp);
-            tmpnum.valid = 0;
-            tmpnum.num_val = cnt;
-            (*val_st).push(tmpnum);
-            break;
-          default:
-            assert(false);
-            break;
-        }
+        sprintf(stmp, "%%%d", value);
       }
+      strcat(str, stmp);
+      return 0;
+    }
+
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
+              std::map<std::string, sym_t>* val_ma) const override {
+      exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
     }
 };
 
@@ -605,34 +1202,36 @@ class MulExpAST : public BaseAST {
     std::unique_ptr<BaseAST> mul_exp;
     int mode;
 
-    int Cal(std::map<std::string, sym_t>* val_ma) override {
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override {
       int val = 0, valx, valy;
       switch (mode){
         case 1:
-          val = unary_exp->Cal(val_ma);
+          val = unary_exp->Cal(str, val_st, val_ma);
           break;
         case 2:
-          valx = mul_exp->Cal(val_ma);
-          valy = unary_exp->Cal(val_ma);
+          valx = mul_exp->Cal(str, val_st, val_ma);
+          valy = unary_exp->Cal(str, val_st, val_ma);
           val = valx * valy;
           break;
         case 3:
-          valx = mul_exp->Cal(val_ma);
-          valy = unary_exp->Cal(val_ma);
+          valx = mul_exp->Cal(str, val_st, val_ma);
+          valy = unary_exp->Cal(str, val_st, val_ma);
           val = valx / valy;
           break;
         case 4:
-          valx = mul_exp->Cal(val_ma);
-          valy = unary_exp->Cal(val_ma);
+          valx = mul_exp->Cal(str, val_st, val_ma);
+          valy = unary_exp->Cal(str, val_st, val_ma);
           val = valx % valy;
           break;
         default:
+          assert(false);
           break;
       }
       return val;
     }
 
-    void Dump(char *str, int & cnt, std::stack<num_t>* val_st,
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
               std::map<std::string, sym_t>* val_ma) const override {
       num_t tmpnum1, tmpnum2;
       int value1, value2;
@@ -640,12 +1239,12 @@ class MulExpAST : public BaseAST {
       switch (mode){
         case 1:
           // std::cout << "mul_exp dump1" << std::endl;
-          unary_exp->Dump(str, cnt, val_st, val_ma);
+          unary_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           break;
         case 2:
           // std::cout << "mul_exp dump2" << std::endl;
-          mul_exp->Dump(str, cnt, val_st, val_ma);
-          unary_exp->Dump(str, cnt, val_st, val_ma);
+          mul_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          unary_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           tmpnum1 = (*val_st).top();
           value1 = tmpnum1.num_val;
           (*val_st).pop();
@@ -676,8 +1275,8 @@ class MulExpAST : public BaseAST {
           break;
         case 3:
           // std::cout << "mul_exp dump3" << std::endl;
-          mul_exp->Dump(str, cnt, val_st, val_ma);
-          unary_exp->Dump(str, cnt, val_st, val_ma);
+          mul_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          unary_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           tmpnum1 = (*val_st).top();
           value1 = tmpnum1.num_val;
           (*val_st).pop();
@@ -708,8 +1307,8 @@ class MulExpAST : public BaseAST {
           break;
         case 4:
           // std::cout << "mul_exp dump4" << std::endl;
-          mul_exp->Dump(str, cnt, val_st, val_ma);
-          unary_exp->Dump(str, cnt, val_st, val_ma);
+          mul_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          unary_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           tmpnum1 = (*val_st).top();
           value1 = tmpnum1.num_val;
           (*val_st).pop();
@@ -752,29 +1351,31 @@ class AddExpAST : public BaseAST {
     std::unique_ptr<BaseAST> add_exp;
     int mode;
 
-    int Cal(std::map<std::string, sym_t>* val_ma) override {
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override {
       int val = 0, valx, valy;
       switch (mode){
         case 1:
-          val = mul_exp->Cal(val_ma);
+          val = mul_exp->Cal(str, val_st, val_ma);
           break;
         case 2:
-          valx = add_exp->Cal(val_ma);
-          valy = mul_exp->Cal(val_ma);
+          valx = add_exp->Cal(str, val_st, val_ma);
+          valy = mul_exp->Cal(str, val_st, val_ma);
           val = valx + valy;
           break;
         case 3:
-          valx = add_exp->Cal(val_ma);
-          valy = mul_exp->Cal(val_ma);
+          valx = add_exp->Cal(str, val_st, val_ma);
+          valy = mul_exp->Cal(str, val_st, val_ma);
           val = valx - valy;
           break;
         default:
+          assert(false);
           break;
       }
       return val;
     }
 
-    void Dump(char *str, int & cnt, std::stack<num_t>* val_st,
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
               std::map<std::string, sym_t>* val_ma) const override {
       num_t tmpnum1, tmpnum2;
       int value1, value2;
@@ -782,12 +1383,12 @@ class AddExpAST : public BaseAST {
       switch (mode){
         case 1:
           // std::cout << "add_exp dump1" << std::endl;
-          mul_exp->Dump(str, cnt, val_st, val_ma);
+          mul_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           break;
         case 2:
           // std::cout << "add_exp dump2" << std::endl;
-          add_exp->Dump(str, cnt, val_st, val_ma);
-          mul_exp->Dump(str, cnt, val_st, val_ma);
+          add_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          mul_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           tmpnum1 = (*val_st).top();
           value1 = tmpnum1.num_val;
           (*val_st).pop();
@@ -818,8 +1419,8 @@ class AddExpAST : public BaseAST {
           break;
         case 3:
           // std::cout << "add_exp dump3" << std::endl;
-          add_exp->Dump(str, cnt, val_st, val_ma);
-          mul_exp->Dump(str, cnt, val_st, val_ma);
+          add_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          mul_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           tmpnum1 = (*val_st).top();
           value1 = tmpnum1.num_val;
           (*val_st).pop();
@@ -862,50 +1463,52 @@ class RelExpAST : public BaseAST {
     std::unique_ptr<BaseAST> rel_exp;
     int mode;
     
-    int Cal(std::map<std::string, sym_t>* val_ma) override {
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override {
       int val = 0, valx, valy;
       switch (mode){
         case 1:
-          val = add_exp->Cal(val_ma);
+          val = add_exp->Cal(str, val_st, val_ma);
           break;
         case 2:
-          valx = rel_exp->Cal(val_ma);
-          valy = add_exp->Cal(val_ma);
+          valx = rel_exp->Cal(str, val_st, val_ma);
+          valy = add_exp->Cal(str, val_st, val_ma);
           val = valx < valy;
           break;
         case 3:
-          valx = rel_exp->Cal(val_ma);
-          valy = add_exp->Cal(val_ma);
+          valx = rel_exp->Cal(str, val_st, val_ma);
+          valy = add_exp->Cal(str, val_st, val_ma);
           val = valx > valy;
           break;
         case 4:
-          valx = rel_exp->Cal(val_ma);
-          valy = add_exp->Cal(val_ma);
+          valx = rel_exp->Cal(str, val_st, val_ma);
+          valy = add_exp->Cal(str, val_st, val_ma);
           val = valx <= valy;
           break;
         case 5:
-          valx = rel_exp->Cal(val_ma);
-          valy = add_exp->Cal(val_ma);
+          valx = rel_exp->Cal(str, val_st, val_ma);
+          valy = add_exp->Cal(str, val_st, val_ma);
           val = valx >= valy;
           break;
         default:
+          assert(false);
           break;
       }
       return val;
     }
 
-    void Dump(char *str, int & cnt, std::stack<num_t>* val_st,
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
               std::map<std::string, sym_t>* val_ma) const override {
       num_t tmpnum1, tmpnum2;
       int value1, value2;
       char stmp[20];
       switch (mode){
         case 1:
-          add_exp->Dump(str, cnt, val_st, val_ma);
+          add_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           break;
         case 2:
-          rel_exp->Dump(str, cnt, val_st, val_ma);
-          add_exp->Dump(str, cnt, val_st, val_ma);
+          rel_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          add_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           tmpnum1 = (*val_st).top();
           value1 = tmpnum1.num_val;
           (*val_st).pop();
@@ -935,8 +1538,8 @@ class RelExpAST : public BaseAST {
           (*val_st).push(tmpnum1);
           break;
         case 3:
-          rel_exp->Dump(str, cnt, val_st, val_ma);
-          add_exp->Dump(str, cnt, val_st, val_ma);
+          rel_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          add_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           tmpnum1 = (*val_st).top();
           value1 = tmpnum1.num_val;
           (*val_st).pop();
@@ -966,8 +1569,8 @@ class RelExpAST : public BaseAST {
           (*val_st).push(tmpnum1);
           break;
         case 4:
-          rel_exp->Dump(str, cnt, val_st, val_ma);
-          add_exp->Dump(str, cnt, val_st, val_ma);
+          rel_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          add_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           tmpnum1 = (*val_st).top();
           value1 = tmpnum1.num_val;
           (*val_st).pop();
@@ -997,8 +1600,8 @@ class RelExpAST : public BaseAST {
           (*val_st).push(tmpnum1);
           break;
         case 5:
-          rel_exp->Dump(str, cnt, val_st, val_ma);
-          add_exp->Dump(str, cnt, val_st, val_ma);
+          rel_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          add_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           tmpnum1 = (*val_st).top();
           value1 = tmpnum1.num_val;
           (*val_st).pop();
@@ -1041,40 +1644,42 @@ class EqExpAST : public BaseAST {
     std::unique_ptr<BaseAST> eq_exp;
     int mode;
 
-    int Cal(std::map<std::string, sym_t>* val_ma) override {
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override {
       int val = 0, valx, valy;
       switch (mode){
         case 1:
-          val = rel_exp->Cal(val_ma);
+          val = rel_exp->Cal(str, val_st, val_ma);
           break;
         case 2:
-          valx = eq_exp->Cal(val_ma);
-          valy = rel_exp->Cal(val_ma);
+          valx = eq_exp->Cal(str, val_st, val_ma);
+          valy = rel_exp->Cal(str, val_st, val_ma);
           val = valx == valy;
           break;
         case 3:
-          valx = eq_exp->Cal(val_ma);
-          valy = rel_exp->Cal(val_ma);
+          valx = eq_exp->Cal(str, val_st, val_ma);
+          valy = rel_exp->Cal(str, val_st, val_ma);
           val = valx != valy;
           break;
         default:
+          assert(false);
           break;
       }
       return val;
     }
 
-    void Dump(char *str, int & cnt, std::stack<num_t>* val_st,
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
               std::map<std::string, sym_t>* val_ma) const override {
       num_t tmpnum1, tmpnum2;
       int value1, value2;
       char stmp[20];
       switch (mode){
         case 1:
-          rel_exp->Dump(str, cnt, val_st, val_ma);
+          rel_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           break;
         case 2:
-          eq_exp->Dump(str, cnt, val_st, val_ma);
-          rel_exp->Dump(str, cnt, val_st, val_ma);
+          eq_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          rel_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           tmpnum1 = (*val_st).top();
           value1 = tmpnum1.num_val;
           (*val_st).pop();
@@ -1104,8 +1709,8 @@ class EqExpAST : public BaseAST {
           (*val_st).push(tmpnum1);
           break;
         case 3:
-          eq_exp->Dump(str, cnt, val_st, val_ma);
-          rel_exp->Dump(str, cnt, val_st, val_ma);
+          eq_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          rel_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           tmpnum1 = (*val_st).top();
           value1 = tmpnum1.num_val;
           (*val_st).pop();
@@ -1148,35 +1753,37 @@ class LAndExpAST : public BaseAST {
     std::unique_ptr<BaseAST> land_exp;
     int mode;
 
-    int Cal(std::map<std::string, sym_t>* val_ma) override {
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override {
       int val = 0, valx, valy;
       switch (mode){
         case 1:
-          val = eq_exp->Cal(val_ma);
+          val = eq_exp->Cal(str, val_st, val_ma);
           break;
         case 2:
-          valx = land_exp->Cal(val_ma);
-          valy = eq_exp->Cal(val_ma);
+          valx = land_exp->Cal(str, val_st, val_ma);
+          valy = eq_exp->Cal(str, val_st, val_ma);
           val = valx && valy;
           break;
         default:
+          assert(false);
           break;
       }
       return val;
     }
 
-    void Dump(char *str, int & cnt, std::stack<num_t>* val_st,
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
               std::map<std::string, sym_t>* val_ma) const override {
       num_t tmpnum1, tmpnum2;
       int value1, value2;
       char stmp[20];
       switch (mode){
         case 1:
-          eq_exp->Dump(str, cnt, val_st, val_ma);
+          eq_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           break;
         case 2:
-          land_exp->Dump(str, cnt, val_st, val_ma);
-          eq_exp->Dump(str, cnt, val_st, val_ma);
+          land_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          eq_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           tmpnum1 = (*val_st).top();
           value1 = tmpnum1.num_val;
           (*val_st).pop();
@@ -1267,35 +1874,37 @@ class LOrExpAST : public BaseAST {
     std::unique_ptr<BaseAST> lor_exp;
     int mode;
 
-    int Cal(std::map<std::string, sym_t>* val_ma) override {
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override {
       int val = 0, valx, valy;
       switch (mode){
         case 1:
-          val = land_exp->Cal(val_ma);
+          val = land_exp->Cal(str, val_st, val_ma);
           break;
         case 2:
-          valx = lor_exp->Cal(val_ma);
-          valy = land_exp->Cal(val_ma);
+          valx = lor_exp->Cal(str, val_st, val_ma);
+          valy = land_exp->Cal(str, val_st, val_ma);
           val = valx || valy;
           break;
         default:
+          assert(false);
           break;
       }
       return val;
     }
 
-    void Dump(char *str, int & cnt, std::stack<num_t>* val_st,
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
               std::map<std::string, sym_t>* val_ma) const override {
       num_t tmpnum1, tmpnum2;
       int value1, value2;
       char stmp[20];
       switch (mode){
         case 1:
-          land_exp->Dump(str, cnt, val_st, val_ma);
+          land_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           break;
         case 2:
-          lor_exp->Dump(str, cnt, val_st, val_ma);
-          land_exp->Dump(str, cnt, val_st, val_ma);
+          lor_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          land_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           tmpnum1 = (*val_st).top();
           value1 = tmpnum1.num_val;
           (*val_st).pop();
@@ -1384,13 +1993,14 @@ class ConstExpAST : public BaseAST {
   public:
     std::unique_ptr<BaseAST> exp;
 
-    int Cal(std::map<std::string, sym_t>* val_ma) override {
-      int val = exp->Cal(val_ma);
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override {
+      int val = exp->Cal(str, val_st, val_ma);
       return val;
     }
 
-    void Dump(char *str, int & cnt, std::stack<num_t>* val_st,
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
               std::map<std::string, sym_t>* val_ma) const override {
-      exp->Dump(str, cnt, val_st, val_ma);
+      exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
     }
 };

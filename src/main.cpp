@@ -1,4 +1,3 @@
-#pragma once
 #include <cassert>
 #include <cstdio>
 #include <iostream>
@@ -21,9 +20,11 @@ extern FILE *yyin;
 extern FILE *yyout;
 extern int yyparse(unique_ptr<BaseAST> &ast);
 extern void solve_koopa(char *str);
+void init_str(char *str, std::map<std::string, sym_t>* val_ma);
 
 int cnt;
 stack<num_t>* val_st = new stack<num_t>;
+stack<int>* loop_cur = new stack<int>;
 map<string, sym_t>* val_ma = new map<string, sym_t>;
 
 int main(int argc, const char *argv[]) {
@@ -34,6 +35,8 @@ int main(int argc, const char *argv[]) {
     auto input = argv[2];
     auto output = argv[4];
 
+    char *str = (char *)malloc(10000 * sizeof(char));
+
     // 打开输入文件, 并且指定 lexer 在解析的时候读取这个文件
     yyin = freopen(input, "r", stdin);
     assert(yyin);
@@ -42,15 +45,15 @@ int main(int argc, const char *argv[]) {
     yyout = freopen(output, "w", stdout);
     // assert(yyout);
 
+    init_str(str, val_ma);
+
     // 调用 parser 函数, parser 函数会进一步调用 lexer 解析输入文件的
     unique_ptr<BaseAST> ast;
     auto ret = yyparse(ast);
     assert(!ret);
-
-    char *str = (char *)malloc(10000 * sizeof(char));
-
+    
     // 输出解析得到的 AST, 其实就是个字符串
-    ast->Dump(str, cnt, val_st, val_ma);
+    ast->Dump(str, cnt, loop_cur, val_st, 0, val_ma);
     if (mode[1] == 'k'){
         cout << str;
     } else if (mode[1] == 'r'){
@@ -59,9 +62,49 @@ int main(int argc, const char *argv[]) {
         cerr << "Unknown Parameters!" << endl;
     }
 
+    (*val_ma).clear();
+    free(val_st);
+    free(loop_cur);
+    free(val_ma);
     free(str);
 
     fclose(stdin);
     fclose(stdout);
     return 0;
+}
+
+void init_str(char *str, std::map<std::string, sym_t>* val_ma){
+  char stmp[50];
+  sprintf(stmp, "decl @getint(): i32\ndecl @getch(): i32\n");
+  strcat(str, stmp);
+  sprintf(stmp, "decl @getarray(*i32): i32\ndecl @putint(i32)\n");
+  strcat(str, stmp);
+  sprintf(stmp, "decl @putch(i32)\ndecl @putarray(i32, *i32)\n");
+  strcat(str, stmp);
+  sprintf(stmp, "decl @starttime()\ndecl @stoptime()\n\n");
+  strcat(str, stmp);
+
+  sym_t tmp_loop;
+  tmp_loop.val_t = 0;
+  std::string s;
+
+  tmp_loop.type = 2;
+  s = "getint";
+  (*val_ma)[s] = tmp_loop;
+  s = "getch";
+  (*val_ma)[s] = tmp_loop;
+  s = "getarray";
+  (*val_ma)[s] = tmp_loop;
+
+  tmp_loop.type = 3;
+  s = "putint";
+  (*val_ma)[s] = tmp_loop;
+  s = "putch";
+  (*val_ma)[s] = tmp_loop;
+  s = "putarray";
+  (*val_ma)[s] = tmp_loop;
+  s = "starttime";
+  (*val_ma)[s] = tmp_loop;
+  s = "stoptime";
+  (*val_ma)[s] = tmp_loop;
 }

@@ -1,14 +1,17 @@
-#pragma once
 #include <cassert>
 #include <cstdio>
 #include <iostream>
 #include <cstdlib>
 #include <memory>
+#include <stack>
 #include <string>
 #include <cstring>
+#include "sym.hpp"
 #include "koopa.h"
 
 int cnt_reg = -1;
+int sum_stack;
+std::stack<num_t> value_st;
 const char reg[32][5] = {"t0", "t1", "t2", "t3", "t4", "t5", "t6",
                          "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a0"};
 
@@ -22,6 +25,7 @@ void Visit_integer(const koopa_raw_integer_t &integer){
 void Visit_binary(const koopa_raw_binary_t &binary){
   koopa_raw_value_t lhs = binary.lhs;
   koopa_raw_value_t rhs = binary.rhs;
+  num_t tmpnum, tmpnum1, tmpnum2;
   switch (binary.op){
     // Not equal to
     case KOOPA_RBO_NOT_EQ:
@@ -30,14 +34,66 @@ void Visit_binary(const koopa_raw_binary_t &binary){
         printf("  li    %s, ", reg[cnt_reg]);
         Visit_integer(lhs->kind.data.integer);
         std::cout << std::endl;
+        if (rhs->kind.tag == KOOPA_RVT_INTEGER){
+          if (rhs->kind.data.integer.value == 0){
+            printf("  xor   %s, %s, x0\n", reg[cnt_reg], reg[cnt_reg]);
+            printf("  snez  %s, %s\n", reg[cnt_reg], reg[cnt_reg]);
+            tmpnum.num_val = cnt_reg;
+            value_st.push(tmpnum);
+          }
+          else{
+            cnt_reg++;
+            printf("  li    %s, ", reg[cnt_reg]);
+            Visit_integer(rhs->kind.data.integer);
+            std::cout << std::endl;
+            printf("  xor   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg-1], reg[cnt_reg]);
+            printf("  snez  %s, %s\n", reg[cnt_reg], reg[cnt_reg]);
+            tmpnum.num_val = cnt_reg;
+            value_st.push(tmpnum);
+          }
+        }
+        else{
+          tmpnum2 = value_st.top();
+          value_st.pop();
+          printf("  xor   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg], reg[tmpnum2.num_val]);
+          printf("  snez  %s, %s\n", reg[cnt_reg], reg[cnt_reg]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
+        }
       }
-      if (rhs->kind.tag == KOOPA_RVT_INTEGER){
-        cnt_reg++;
-        printf("  li    %s, ", reg[cnt_reg]);
-        Visit_integer(rhs->kind.data.integer);
-        std::cout << std::endl;
+      else{
+        if (rhs->kind.tag == KOOPA_RVT_INTEGER){
+          tmpnum1 = value_st.top();
+          value_st.pop();
+          if (rhs->kind.data.integer.value == 0){
+            printf("  xor   %s, %s, x0\n", reg[tmpnum1.num_val], reg[tmpnum1.num_val]);
+            printf("  snez  %s, %s\n", reg[tmpnum1.num_val], reg[tmpnum1.num_val]);
+            tmpnum.num_val = tmpnum1.num_val;
+            value_st.push(tmpnum);
+          }
+          else{
+            cnt_reg++;
+            printf("  li    %s, ", reg[cnt_reg]);
+            Visit_integer(rhs->kind.data.integer);
+            std::cout << std::endl;
+            // std::cout << "---" << std::endl;
+            printf("  xor   %s, %s, %s\n", reg[cnt_reg], reg[tmpnum1.num_val], reg[cnt_reg]);
+            printf("  snez  %s, %s\n", reg[cnt_reg], reg[cnt_reg]);
+            tmpnum.num_val = cnt_reg;
+            value_st.push(tmpnum);
+          }
+        }
+        else{
+          tmpnum2 = value_st.top();
+          value_st.pop();
+          tmpnum1 = value_st.top();
+          value_st.pop();
+          printf("  xor   %s, %s, %s\n", reg[tmpnum2.num_val], reg[tmpnum1.num_val], reg[tmpnum2.num_val]);
+          printf("  seqz  %s, %s\n", reg[tmpnum2.num_val], reg[tmpnum2.num_val]);
+          tmpnum.num_val = tmpnum2.num_val;
+          value_st.push(tmpnum);
+        }
       }
-      printf("  add   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg-1], reg[cnt_reg]);
       break;
 
     // Equal to
@@ -47,20 +103,65 @@ void Visit_binary(const koopa_raw_binary_t &binary){
         printf("  li    %s, ", reg[cnt_reg]);
         Visit_integer(lhs->kind.data.integer);
         std::cout << std::endl;
-      }
-      if (rhs->kind.tag == KOOPA_RVT_INTEGER){
-        if (rhs->kind.data.integer.value == 0){
-          printf("  xor   %s, %s, x0\n", reg[cnt_reg], reg[cnt_reg]);
-          printf("  seqz  %s, %s\n", reg[cnt_reg], reg[cnt_reg]);
+        if (rhs->kind.tag == KOOPA_RVT_INTEGER){
+          if (rhs->kind.data.integer.value == 0){
+            printf("  xor   %s, %s, x0\n", reg[cnt_reg], reg[cnt_reg]);
+            printf("  seqz  %s, %s\n", reg[cnt_reg], reg[cnt_reg]);
+            tmpnum.num_val = cnt_reg;
+            value_st.push(tmpnum);
+          }
+          else{
+            cnt_reg++;
+            printf("  li    %s, ", reg[cnt_reg]);
+            Visit_integer(rhs->kind.data.integer);
+            std::cout << std::endl;
+            printf("  xor   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg-1], reg[cnt_reg]);
+            printf("  seqz  %s, %s\n", reg[cnt_reg], reg[cnt_reg]);
+            tmpnum.num_val = cnt_reg;
+            value_st.push(tmpnum);
+          }
         }
         else{
-          cnt_reg++;
-          printf("  li    %s, ", reg[cnt_reg]);
-          Visit_integer(rhs->kind.data.integer);
-          std::cout << std::endl;
-          printf("  xor   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg-1], reg[cnt_reg]);
+          tmpnum2 = value_st.top();
+          value_st.pop();
+          printf("  xor   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg], reg[tmpnum2.num_val]);
           printf("  seqz  %s, %s\n", reg[cnt_reg], reg[cnt_reg]);
-        } 
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
+        }
+      }
+      else{
+        if (rhs->kind.tag == KOOPA_RVT_INTEGER){
+          tmpnum1 = value_st.top();
+          value_st.pop();
+          if (rhs->kind.data.integer.value == 0){
+            // std::cout << "---" << std::endl;
+            printf("  xor   %s, %s, x0\n", reg[tmpnum1.num_val], reg[tmpnum1.num_val]);
+            printf("  seqz  %s, %s\n", reg[tmpnum1.num_val], reg[tmpnum1.num_val]);
+            tmpnum.num_val = tmpnum1.num_val;
+            value_st.push(tmpnum);
+          }
+          else{
+            cnt_reg++;
+            printf("  li    %s, ", reg[cnt_reg]);
+            Visit_integer(rhs->kind.data.integer);
+            std::cout << std::endl;
+            printf("  xor   %s, %s, %s\n", reg[cnt_reg], reg[tmpnum1.num_val], reg[cnt_reg]);
+            printf("  seqz  %s, %s\n", reg[cnt_reg], reg[cnt_reg]);
+            tmpnum.num_val = cnt_reg;
+            value_st.push(tmpnum);
+          }
+        }
+        else{
+          tmpnum2 = value_st.top();
+          value_st.pop();
+          tmpnum1 = value_st.top();
+          value_st.pop();
+          printf("  xor   %s, %s, %s\n", reg[tmpnum2.num_val], reg[tmpnum1.num_val], reg[tmpnum2.num_val]);
+          printf("  seqz  %s, %s\n", reg[tmpnum2.num_val], reg[tmpnum2.num_val]);
+          tmpnum.num_val = tmpnum2.num_val;
+          value_st.push(tmpnum);
+        }
       }
       break;
 
@@ -71,14 +172,45 @@ void Visit_binary(const koopa_raw_binary_t &binary){
         printf("  li    %s, ", reg[cnt_reg]);
         Visit_integer(lhs->kind.data.integer);
         std::cout << std::endl;
+        if (rhs->kind.tag == KOOPA_RVT_INTEGER){
+          cnt_reg++;
+          printf("  li    %s, ", reg[cnt_reg]);
+          Visit_integer(rhs->kind.data.integer);
+          std::cout << std::endl;
+          printf("  sgt   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg-1], reg[cnt_reg]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
+        }
+        else{
+          tmpnum2 = value_st.top();
+          value_st.pop();
+          printf("  sgt   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg], reg[tmpnum2.num_val]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
+        }
       }
-      if (rhs->kind.tag == KOOPA_RVT_INTEGER){
-        cnt_reg++;
-        printf("  li    %s, ", reg[cnt_reg]);
-        Visit_integer(rhs->kind.data.integer);
-        std::cout << std::endl;
+      else{
+        if (rhs->kind.tag == KOOPA_RVT_INTEGER){
+          tmpnum1 = value_st.top();
+          value_st.pop();
+          cnt_reg++;
+          printf("  li    %s, ", reg[cnt_reg]);
+          Visit_integer(rhs->kind.data.integer);
+          std::cout << std::endl;
+          printf("  sgt   %s, %s, %s\n", reg[cnt_reg], reg[tmpnum1.num_val], reg[cnt_reg]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
+        }
+        else{
+          tmpnum2 = value_st.top();
+          value_st.pop();
+          tmpnum1 = value_st.top();
+          value_st.pop();
+          printf("  sgt   %s, %s, %s\n", reg[tmpnum2.num_val], reg[tmpnum1.num_val], reg[tmpnum2.num_val]);
+          tmpnum.num_val = tmpnum2.num_val;
+          value_st.push(tmpnum);
+        }
       }
-      printf("  sgt   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg-1], reg[cnt_reg]);
       break;
 
     // Less than
@@ -88,14 +220,45 @@ void Visit_binary(const koopa_raw_binary_t &binary){
         printf("  li    %s, ", reg[cnt_reg]);
         Visit_integer(lhs->kind.data.integer);
         std::cout << std::endl;
+        if (rhs->kind.tag == KOOPA_RVT_INTEGER){
+          cnt_reg++;
+          printf("  li    %s, ", reg[cnt_reg]);
+          Visit_integer(rhs->kind.data.integer);
+          std::cout << std::endl;
+          printf("  slt   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg-1], reg[cnt_reg]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
+        }
+        else{
+          tmpnum2 = value_st.top();
+          value_st.pop();
+          printf("  slt   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg], reg[tmpnum2.num_val]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
+        }
       }
-      if (rhs->kind.tag == KOOPA_RVT_INTEGER){
-        cnt_reg++;
-        printf("  li    %s, ", reg[cnt_reg]);
-        Visit_integer(rhs->kind.data.integer);
-        std::cout << std::endl;
+      else{
+        if (rhs->kind.tag == KOOPA_RVT_INTEGER){
+          tmpnum1 = value_st.top();
+          value_st.pop();
+          cnt_reg++;
+          printf("  li    %s, ", reg[cnt_reg]);
+          Visit_integer(rhs->kind.data.integer);
+          std::cout << std::endl;
+          printf("  slt   %s, %s, %s\n", reg[cnt_reg], reg[tmpnum1.num_val], reg[cnt_reg]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
+        }
+        else{
+          tmpnum2 = value_st.top();
+          value_st.pop();
+          tmpnum1 = value_st.top();
+          value_st.pop();
+          printf("  slt   %s, %s, %s\n", reg[tmpnum2.num_val], reg[tmpnum1.num_val], reg[tmpnum2.num_val]);
+          tmpnum.num_val = tmpnum2.num_val;
+          value_st.push(tmpnum);
+        }
       }
-      printf("  slt   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg-1], reg[cnt_reg]);
       break;
 
     // Greater than or equal to
@@ -105,15 +268,49 @@ void Visit_binary(const koopa_raw_binary_t &binary){
         printf("  li    %s, ", reg[cnt_reg]);
         Visit_integer(lhs->kind.data.integer);
         std::cout << std::endl;
+        if (rhs->kind.tag == KOOPA_RVT_INTEGER){
+          cnt_reg++;
+          printf("  li    %s, ", reg[cnt_reg]);
+          Visit_integer(rhs->kind.data.integer);
+          std::cout << std::endl;
+          printf("  slt   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg-1], reg[cnt_reg]);
+          printf("  seqz  %s, %s\n", reg[cnt_reg], reg[cnt_reg]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
+        }
+        else{
+          tmpnum2 = value_st.top();
+          value_st.pop();
+          printf("  slt   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg], reg[tmpnum2.num_val]);
+          printf("  seqz  %s, %s\n", reg[cnt_reg], reg[cnt_reg]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
+        }
       }
-      if (rhs->kind.tag == KOOPA_RVT_INTEGER){
-        cnt_reg++;
-        printf("  li    %s, ", reg[cnt_reg]);
-        Visit_integer(rhs->kind.data.integer);
-        std::cout << std::endl;
+      else{
+        if (rhs->kind.tag == KOOPA_RVT_INTEGER){
+          tmpnum1 = value_st.top();
+          value_st.pop();
+          cnt_reg++;
+          printf("  li    %s, ", reg[cnt_reg]);
+          Visit_integer(rhs->kind.data.integer);
+          std::cout << std::endl;
+          printf("  slt   %s, %s, %s\n", reg[cnt_reg], reg[tmpnum1.num_val], reg[cnt_reg]);
+          printf("  seqz  %s, %s\n", reg[cnt_reg], reg[cnt_reg]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
+        }
+        else{
+          tmpnum2 = value_st.top();
+          value_st.pop();
+          tmpnum1 = value_st.top();
+          value_st.pop();
+          printf("  slt   %s, %s, %s\n", reg[tmpnum2.num_val], reg[tmpnum1.num_val], reg[tmpnum2.num_val]);
+          printf("  seqz  %s, %s\n", reg[tmpnum2.num_val], reg[tmpnum2.num_val]);
+          tmpnum.num_val = tmpnum2.num_val;
+          value_st.push(tmpnum);
+        }
       }
-      printf("  slt   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg-1], reg[cnt_reg]);
-      printf("  seqz  %s, %s\n", reg[cnt_reg], reg[cnt_reg]);
       break;
 
     // Less than or equal to
@@ -123,15 +320,49 @@ void Visit_binary(const koopa_raw_binary_t &binary){
         printf("  li    %s, ", reg[cnt_reg]);
         Visit_integer(lhs->kind.data.integer);
         std::cout << std::endl;
+        if (rhs->kind.tag == KOOPA_RVT_INTEGER){
+          cnt_reg++;
+          printf("  li    %s, ", reg[cnt_reg]);
+          Visit_integer(rhs->kind.data.integer);
+          std::cout << std::endl;
+          printf("  sgt   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg-1], reg[cnt_reg]);
+          printf("  seqz  %s, %s\n", reg[cnt_reg], reg[cnt_reg]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
+        }
+        else{
+          tmpnum2 = value_st.top();
+          value_st.pop();
+          printf("  sgt   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg], reg[tmpnum2.num_val]);
+          printf("  seqz  %s, %s\n", reg[cnt_reg], reg[cnt_reg]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
+        }
       }
-      if (rhs->kind.tag == KOOPA_RVT_INTEGER){
-        cnt_reg++;
-        printf("  li    %s, ", reg[cnt_reg]);
-        Visit_integer(rhs->kind.data.integer);
-        std::cout << std::endl;
+      else{
+        if (rhs->kind.tag == KOOPA_RVT_INTEGER){
+          tmpnum1 = value_st.top();
+          value_st.pop();
+          cnt_reg++;
+          printf("  li    %s, ", reg[cnt_reg]);
+          Visit_integer(rhs->kind.data.integer);
+          std::cout << std::endl;
+          printf("  sgt   %s, %s, %s\n", reg[cnt_reg], reg[tmpnum1.num_val], reg[cnt_reg]);
+          printf("  seqz  %s, %s\n", reg[cnt_reg], reg[cnt_reg]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
+        }
+        else{
+          tmpnum2 = value_st.top();
+          value_st.pop();
+          tmpnum1 = value_st.top();
+          value_st.pop();
+          printf("  sgt   %s, %s, %s\n", reg[tmpnum2.num_val], reg[tmpnum1.num_val], reg[tmpnum2.num_val]);
+          printf("  seqz  %s, %s\n", reg[tmpnum2.num_val], reg[tmpnum2.num_val]);
+          tmpnum.num_val = tmpnum2.num_val;
+          value_st.push(tmpnum);
+        }
       }
-      printf("  sgt   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg-1], reg[cnt_reg]);
-      printf("  seqz  %s, %s\n", reg[cnt_reg], reg[cnt_reg]);
       break;
 
     // Addition
@@ -141,42 +372,112 @@ void Visit_binary(const koopa_raw_binary_t &binary){
         printf("  li    %s, ", reg[cnt_reg]);
         Visit_integer(lhs->kind.data.integer);
         std::cout << std::endl;
+        if (rhs->kind.tag == KOOPA_RVT_INTEGER){
+          cnt_reg++;
+          printf("  li    %s, ", reg[cnt_reg]);
+          Visit_integer(rhs->kind.data.integer);
+          std::cout << std::endl;
+          printf("  add   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg-1], reg[cnt_reg]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
+        }
+        else{
+          tmpnum2 = value_st.top();
+          value_st.pop();
+          printf("  add   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg], reg[tmpnum2.num_val]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
+        }
       }
-      if (rhs->kind.tag == KOOPA_RVT_INTEGER){
-        cnt_reg++;
-        printf("  li    %s, ", reg[cnt_reg]);
-        Visit_integer(rhs->kind.data.integer);
-        std::cout << std::endl;
+      else{
+        if (rhs->kind.tag == KOOPA_RVT_INTEGER){
+          tmpnum1 = value_st.top();
+          value_st.pop();
+          cnt_reg++;
+          printf("  li    %s, ", reg[cnt_reg]);
+          Visit_integer(rhs->kind.data.integer);
+          std::cout << std::endl;
+          printf("  add   %s, %s, %s\n", reg[cnt_reg], reg[tmpnum1.num_val], reg[cnt_reg]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
+        }
+        else{
+          tmpnum2 = value_st.top();
+          value_st.pop();
+          tmpnum1 = value_st.top();
+          value_st.pop();
+          printf("  add   %s, %s, %s\n", reg[tmpnum2.num_val], reg[tmpnum1.num_val], reg[tmpnum2.num_val]);
+          tmpnum.num_val = tmpnum2.num_val;
+          value_st.push(tmpnum);
+        }
       }
-      printf("  add   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg-1], reg[cnt_reg]);
       break;
 
     // Subtraction
     case KOOPA_RBO_SUB:
       if (lhs->kind.tag == KOOPA_RVT_INTEGER){
-        cnt_reg++;
-        printf("  li    %s, ", reg[cnt_reg]);
-        Visit_integer(lhs->kind.data.integer);
-        std::cout << std::endl;
-        if (rhs->kind.tag == KOOPA_RVT_INTEGER){
-          cnt_reg++;
-          printf("  li    %s, ", reg[cnt_reg]);
-          Visit_integer(rhs->kind.data.integer);
-          std::cout << std::endl;
-          printf("  sub   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg-1], reg[cnt_reg]);
+        if (lhs->kind.data.integer.value == 0){
+          if (rhs->kind.tag == KOOPA_RVT_INTEGER){
+            cnt_reg++;
+            printf("  li    %s, ", reg[cnt_reg]);
+            Visit_integer(rhs->kind.data.integer);
+            std::cout << std::endl;
+            printf("  sub   %s, x0, %s\n", reg[cnt_reg], reg[cnt_reg]);
+            tmpnum.num_val = cnt_reg;
+            value_st.push(tmpnum);
+          }
+          else{
+            tmpnum2 = value_st.top();
+            value_st.pop();
+            printf("  sub   %s, x0, %s\n", reg[tmpnum2.num_val], reg[tmpnum2.num_val]);
+            tmpnum.num_val = tmpnum2.num_val;
+            value_st.push(tmpnum);
+          }
         }
         else{
-          printf("  sub   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg], reg[cnt_reg-1]);
+          cnt_reg++;
+          printf("  li    %s, ", reg[cnt_reg]);
+          Visit_integer(lhs->kind.data.integer);
+          std::cout << std::endl;
+          if (rhs->kind.tag == KOOPA_RVT_INTEGER){
+            cnt_reg++;
+            printf("  li    %s, ", reg[cnt_reg]);
+            Visit_integer(rhs->kind.data.integer);
+            std::cout << std::endl;
+            printf("  sub   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg-1], reg[cnt_reg]);
+            tmpnum.num_val = cnt_reg;
+            value_st.push(tmpnum);
+          }
+          else{
+            tmpnum2 = value_st.top();
+            value_st.pop();
+            printf("  sub   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg], reg[tmpnum2.num_val]);
+            tmpnum.num_val = cnt_reg;
+            value_st.push(tmpnum);
+          }
         }
       }
       else{
         if (rhs->kind.tag == KOOPA_RVT_INTEGER){
+          tmpnum1 = value_st.top();
+          value_st.pop();
           cnt_reg++;
           printf("  li    %s, ", reg[cnt_reg]);
           Visit_integer(rhs->kind.data.integer);
           std::cout << std::endl;
+          printf("  sub   %s, %s, %s\n", reg[cnt_reg], reg[tmpnum1.num_val], reg[cnt_reg]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
         }
-        printf("  sub   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg], reg[cnt_reg-1]);
+        else{
+          tmpnum2 = value_st.top();
+          value_st.pop();
+          tmpnum1 = value_st.top();
+          value_st.pop();
+          printf("  sub   %s, %s, %s\n", reg[tmpnum2.num_val], reg[tmpnum1.num_val], reg[tmpnum2.num_val]);
+          tmpnum.num_val = tmpnum2.num_val;
+          value_st.push(tmpnum);
+        }
       }
       break;
 
@@ -187,14 +488,45 @@ void Visit_binary(const koopa_raw_binary_t &binary){
         printf("  li    %s, ", reg[cnt_reg]);
         Visit_integer(lhs->kind.data.integer);
         std::cout << std::endl;
+        if (rhs->kind.tag == KOOPA_RVT_INTEGER){
+          cnt_reg++;
+          printf("  li    %s, ", reg[cnt_reg]);
+          Visit_integer(rhs->kind.data.integer);
+          std::cout << std::endl;
+          printf("  mul   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg-1], reg[cnt_reg]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
+        }
+        else{
+          tmpnum2 = value_st.top();
+          value_st.pop();
+          printf("  mul   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg], reg[tmpnum2.num_val]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
+        }
       }
-      if (rhs->kind.tag == KOOPA_RVT_INTEGER){
-        cnt_reg++;
-        printf("  li    %s, ", reg[cnt_reg]);
-        Visit_integer(rhs->kind.data.integer);
-        std::cout << std::endl;
+      else{
+        if (rhs->kind.tag == KOOPA_RVT_INTEGER){
+          tmpnum1 = value_st.top();
+          value_st.pop();
+          cnt_reg++;
+          printf("  li    %s, ", reg[cnt_reg]);
+          Visit_integer(rhs->kind.data.integer);
+          std::cout << std::endl;
+          printf("  mul   %s, %s, %s\n", reg[cnt_reg], reg[tmpnum1.num_val], reg[cnt_reg]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
+        }
+        else{
+          tmpnum2 = value_st.top();
+          value_st.pop();
+          tmpnum1 = value_st.top();
+          value_st.pop();
+          printf("  mul   %s, %s, %s\n", reg[tmpnum2.num_val], reg[tmpnum1.num_val], reg[tmpnum2.num_val]);
+          tmpnum.num_val = tmpnum2.num_val;
+          value_st.push(tmpnum);
+        }
       }
-      printf("  mul   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg-1], reg[cnt_reg]);
       break;
 
     // Division
@@ -210,19 +542,38 @@ void Visit_binary(const koopa_raw_binary_t &binary){
           Visit_integer(rhs->kind.data.integer);
           std::cout << std::endl;
           printf("  div   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg-1], reg[cnt_reg]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
         }
         else{
-          printf("  div   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg], reg[cnt_reg-1]);
+          tmpnum2 = value_st.top();
+          value_st.pop();
+          printf("  div   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg], reg[tmpnum2.num_val]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
         }
       }
       else{
         if (rhs->kind.tag == KOOPA_RVT_INTEGER){
+          tmpnum1 = value_st.top();
+          value_st.pop();
           cnt_reg++;
           printf("  li    %s, ", reg[cnt_reg]);
           Visit_integer(rhs->kind.data.integer);
           std::cout << std::endl;
+          printf("  div   %s, %s, %s\n", reg[cnt_reg], reg[tmpnum1.num_val], reg[cnt_reg]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
         }
-        printf("  div   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg], reg[cnt_reg-1]);
+        else{
+          tmpnum2 = value_st.top();
+          value_st.pop();
+          tmpnum1 = value_st.top();
+          value_st.pop();
+          printf("  div   %s, %s, %s\n", reg[tmpnum2.num_val], reg[tmpnum1.num_val], reg[tmpnum2.num_val]);
+          tmpnum.num_val = tmpnum2.num_val;
+          value_st.push(tmpnum);
+        }
       }
       break;
 
@@ -239,19 +590,38 @@ void Visit_binary(const koopa_raw_binary_t &binary){
           Visit_integer(rhs->kind.data.integer);
           std::cout << std::endl;
           printf("  rem   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg-1], reg[cnt_reg]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
         }
         else{
-          printf("  rem   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg], reg[cnt_reg-1]);
+          tmpnum2 = value_st.top();
+          value_st.pop();
+          printf("  rem   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg], reg[tmpnum2.num_val]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
         }
       }
       else{
         if (rhs->kind.tag == KOOPA_RVT_INTEGER){
+          tmpnum1 = value_st.top();
+          value_st.pop();
           cnt_reg++;
           printf("  li    %s, ", reg[cnt_reg]);
           Visit_integer(rhs->kind.data.integer);
           std::cout << std::endl;
+          printf("  rem   %s, %s, %s\n", reg[cnt_reg], reg[tmpnum1.num_val], reg[cnt_reg]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
         }
-        printf("  rem   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg], reg[cnt_reg-1]);
+        else{
+          tmpnum2 = value_st.top();
+          value_st.pop();
+          tmpnum1 = value_st.top();
+          value_st.pop();
+          printf("  rem   %s, %s, %s\n", reg[tmpnum2.num_val], reg[tmpnum1.num_val], reg[tmpnum2.num_val]);
+          tmpnum.num_val = tmpnum2.num_val;
+          value_st.push(tmpnum);
+        }
       }
       break;
 
@@ -262,14 +632,45 @@ void Visit_binary(const koopa_raw_binary_t &binary){
         printf("  li    %s, ", reg[cnt_reg]);
         Visit_integer(lhs->kind.data.integer);
         std::cout << std::endl;
+        if (rhs->kind.tag == KOOPA_RVT_INTEGER){
+          cnt_reg++;
+          printf("  li    %s, ", reg[cnt_reg]);
+          Visit_integer(rhs->kind.data.integer);
+          std::cout << std::endl;
+          printf("  and   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg-1], reg[cnt_reg]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
+        }
+        else{
+          tmpnum2 = value_st.top();
+          value_st.pop();
+          printf("  and   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg], reg[tmpnum2.num_val]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
+        }
       }
-      if (rhs->kind.tag == KOOPA_RVT_INTEGER){
-        cnt_reg++;
-        printf("  li    %s, ", reg[cnt_reg]);
-        Visit_integer(rhs->kind.data.integer);
-        std::cout << std::endl;
+      else{
+        if (rhs->kind.tag == KOOPA_RVT_INTEGER){
+          tmpnum1 = value_st.top();
+          value_st.pop();
+          cnt_reg++;
+          printf("  li    %s, ", reg[cnt_reg]);
+          Visit_integer(rhs->kind.data.integer);
+          std::cout << std::endl;
+          printf("  and   %s, %s, %s\n", reg[cnt_reg], reg[tmpnum1.num_val], reg[cnt_reg]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
+        }
+        else{
+          tmpnum2 = value_st.top();
+          value_st.pop();
+          tmpnum1 = value_st.top();
+          value_st.pop();
+          printf("  and   %s, %s, %s\n", reg[tmpnum2.num_val], reg[tmpnum1.num_val], reg[tmpnum2.num_val]);
+          tmpnum.num_val = tmpnum2.num_val;
+          value_st.push(tmpnum);
+        }
       }
-      printf("  and   %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg-1], reg[cnt_reg]);
       break;
 
     // Bitwise OR
@@ -279,14 +680,45 @@ void Visit_binary(const koopa_raw_binary_t &binary){
         printf("  li    %s, ", reg[cnt_reg]);
         Visit_integer(lhs->kind.data.integer);
         std::cout << std::endl;
+        if (rhs->kind.tag == KOOPA_RVT_INTEGER){
+          cnt_reg++;
+          printf("  li    %s, ", reg[cnt_reg]);
+          Visit_integer(rhs->kind.data.integer);
+          std::cout << std::endl;
+          printf("  or    %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg-1], reg[cnt_reg]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
+        }
+        else{
+          tmpnum2 = value_st.top();
+          value_st.pop();
+          printf("  or    %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg], reg[tmpnum2.num_val]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
+        }
       }
-      if (rhs->kind.tag == KOOPA_RVT_INTEGER){
-        cnt_reg++;
-        printf("  li    %s, ", reg[cnt_reg]);
-        Visit_integer(rhs->kind.data.integer);
-        std::cout << std::endl;
+      else{
+        if (rhs->kind.tag == KOOPA_RVT_INTEGER){
+          tmpnum1 = value_st.top();
+          value_st.pop();
+          cnt_reg++;
+          printf("  li    %s, ", reg[cnt_reg]);
+          Visit_integer(rhs->kind.data.integer);
+          std::cout << std::endl;
+          printf("  or    %s, %s, %s\n", reg[cnt_reg], reg[tmpnum1.num_val], reg[cnt_reg]);
+          tmpnum.num_val = cnt_reg;
+          value_st.push(tmpnum);
+        }
+        else{
+          tmpnum2 = value_st.top();
+          value_st.pop();
+          tmpnum1 = value_st.top();
+          value_st.pop();
+          printf("  or    %s, %s, %s\n", reg[tmpnum2.num_val], reg[tmpnum1.num_val], reg[tmpnum2.num_val]);
+          tmpnum.num_val = tmpnum2.num_val;
+          value_st.push(tmpnum);
+        }
       }
-      printf("  or    %s, %s, %s\n", reg[cnt_reg], reg[cnt_reg-1], reg[cnt_reg]);
       break;
 
     default:
@@ -295,20 +727,93 @@ void Visit_binary(const koopa_raw_binary_t &binary){
   }
 }
 
+// 访问 alloc 指令
+void Visit_alloc(const koopa_raw_global_alloc_t &alloc){
+  koopa_raw_value_t init = alloc.init;
+  // std::cout << "alloc tag = " << init->kind.tag << std::endl;
+  switch (init->kind.tag){
+    case KOOPA_RVT_INTEGER:
+      break;
+    default:
+      break;
+  }
+}
+
+// 访问 global alloc 指令
+void Visit_global_alloc(const koopa_raw_global_alloc_t &global_alloc){
+
+}
+
+// 访问 load 指令
+void Visit_load(const koopa_raw_load_t &load){
+  koopa_raw_value_t src = load.src;
+  // std::cout << "tag = " << src->kind.tag << std::endl;
+  switch (src->kind.tag){
+    case KOOPA_RVT_ALLOC:
+      break;
+    default:
+      break;
+  }
+}
+
+// 访问 store 指令
+void Visit_store(const koopa_raw_store_t &store){
+  koopa_raw_value_t value = store.value;
+  // std::cout << "value tag = " << value->kind.tag << std::endl;
+  // koopa_raw_value_t dest = store.dest;
+  // std::cout << "dest data = " << dest->kind.data.global_alloc.init->kind.tag << std::endl;
+  switch (value->kind.tag){
+    // 数字
+    case KOOPA_RVT_INTEGER:
+      cnt_reg++;
+      printf("  li    %s, ", reg[cnt_reg]);
+      Visit_integer(value->kind.data.integer);
+      printf("\n");
+      printf("  sw    %s, %d(sp)\n", reg[cnt_reg], 444);
+      break;
+    // 运算结果
+    case KOOPA_RVT_BINARY:
+
+    default:
+      assert(false);
+  }
+}
+
+// 访问 branch
+void Visit_branch(const koopa_raw_branch_t &branch){
+
+}
+
+// 访问 jump
+void Visit_jump(const koopa_raw_jump_t &jump){
+
+}
+
+// 访问 call
+void Visit_call(const koopa_raw_call_t &call){
+  
+}
+
 // 访问 return 指令
 void Visit_ret(const koopa_raw_return_t &ret){
   koopa_raw_value_t ret_value = ret.value;
+  num_t tmp_num;
   switch (ret_value->kind.tag) {
     // 直接返回数字
     case KOOPA_RVT_INTEGER:
       printf("  li    a0, ");
       Visit_integer(ret_value->kind.data.integer);
-      printf("\n  ret\n");
+      printf("\n");
+      printf("  addi    sp, sp, %d\n", sum_stack*4);
+      printf("  ret\n");
       break;
 
     // 返回运算结果
     case KOOPA_RVT_BINARY:
-      printf("  mv    a0, %s\n", reg[cnt_reg]);
+      tmp_num = value_st.top();
+      value_st.pop();
+      printf("  mv    a0, %s\n", reg[tmp_num.num_val]);
+      printf("  addi    sp, sp, %d\n", sum_stack*4);
       printf("  ret\n");
       break;
     default:
@@ -326,14 +831,52 @@ void Visit_inst(const koopa_raw_value_t &value){
       // 访问 integer 指令
       Visit_integer(kind.data.integer);
       break;
+    
+    case KOOPA_RVT_ALLOC:
+      // 访问 alloc 指令
+      Visit_alloc(kind.data.global_alloc);
+      break;
+    
+    case KOOPA_RVT_GLOBAL_ALLOC:
+      // 访问 global alloc 指令
+      Visit_global_alloc(kind.data.global_alloc);
+      break;
+
+    case KOOPA_RVT_LOAD:
+      // 访问 load 指令
+      Visit_load(kind.data.load);
+      break;
+    
+    case KOOPA_RVT_STORE:
+      // 访问 store 指令
+      Visit_store(kind.data.store);
+      break;
+    
+    case KOOPA_RVT_BRANCH:
+      // 访问 branch 指令
+      Visit_branch(kind.data.branch);
+      break;
+    
+    case KOOPA_RVT_JUMP:
+      // 访问 jump 指令
+      Visit_jump(kind.data.jump);
+      break;
+    
+    case KOOPA_RVT_CALL:
+      // 访问 call 指令
+      Visit_call(kind.data.call);
+      break;
+
     case KOOPA_RVT_BINARY:
       // 访问 binary 指令
       Visit_binary(kind.data.binary);
       break;
+    
     case KOOPA_RVT_RETURN:
       // 访问 return 指令
       Visit_ret(kind.data.ret);
       break;
+    
     default:
       // 其他类型暂时遇不到
       assert(false);
@@ -352,12 +895,31 @@ void Visit_block(const koopa_raw_basic_block_t &bb){
   }
 }
 
+int Cal_block(const koopa_raw_basic_block_t &bb){
+  int tmp = 0;
+  // std::cout << "bbs.len = " << bb->insts.len << std::endl;
+  for (size_t i = 0; i < bb->insts.len; ++i){
+    auto ptr = bb->insts.buffer[i];
+    const koopa_raw_value_t &inst = reinterpret_cast<koopa_raw_value_t>(ptr);
+    if (inst->ty->tag != KOOPA_RTT_UNIT) tmp++;
+  }
+  return tmp;
+}
+
 // 访问函数
 void Visit_func(const koopa_raw_function_t &func){
   // 执行一些其他的必要操作
   std::cout << "main:" << std::endl;
 
   // 访问所有基本块
+  for (size_t i = 0; i < func->bbs.len; ++i){
+    auto ptr = func->bbs.buffer[i];
+    sum_stack += Cal_block(reinterpret_cast<koopa_raw_basic_block_t>(ptr));
+    // std::cout << "sum_stack = " << sum_stack << std::endl;
+  }
+
+  printf("  addi   sp, sp, -%d\n\n", sum_stack*4);
+
   for (size_t i = 0; i < func->bbs.len; ++i){
     auto ptr = func->bbs.buffer[i];
     Visit_block(reinterpret_cast<koopa_raw_basic_block_t>(ptr));
