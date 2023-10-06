@@ -1,6 +1,7 @@
 #pragma once
 #include <iostream>
 #include <stack>
+#include <vector>
 
 struct num_t{
   // valid = 1 => 数值
@@ -15,5 +16,7 @@ struct sym_t{
   // tpye = 3 => void 函数
 
   // type = 5 => 参数变量
-  int val_t, type;
+  // type = 6 => 数组
+  int val_t, type, number;
+  std::vector<int> array;
 };

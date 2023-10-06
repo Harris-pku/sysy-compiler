@@ -1,55 +1,56 @@
-TreeHead      ::= CompUnit
+TreeHead        ::= CompUnit
 
-CompUnit      ::= FuncDef | Decl | CompUnit FuncDef | CompUnit Decl
+CompUnit        ::= FuncDef | Decl | CompUnit FuncDef | CompUnit Decl
 
-Decl          ::= ConstDecl | VarDecl
-ConstDecl     ::= CONST INT ConstDefArr ";"
-ConstDefArr   ::= ConstDefArr "," ConstDef | ConstDef
-ConstDef      ::= IDENT "=" ConstInitVal
-                | IDENT "[" ConstExp "]" "=" ConstInitVal
-ConstInitVal  ::= ConstExp | "{" "}" | "{" ConstExpArr "}"
-ConstExpArr   ::= ConstExp | ConstExpArr "," ConstExp
-VarDecl       ::= INT VarDefArr ";"
-VarDefArr     ::= VarDefArr "," VarDef | VarDef
-VarDef        ::= IDENT | IDENT "=" InitVal
-InitVal       ::= InitVal ::= Exp | "{" "}" | "{" ExpArr "}"
-ExpArr ::= Exp | ExpArr "," Exp
+Decl            ::= ConstDecl | VarDecl
+ConstDecl       ::= CONST INT ConstDefArr ";"
+ConstDefArr     ::= ConstDefArr "," ConstDef | ConstDef
+ConstDef        ::= IDENT "=" ConstInitVal
+                | IDENT ConstExpMuti "=" ConstInitVal
+ConstInitVal    ::= ConstExp | "{" "}" | "{" ConstInitValArr "}"
+ConstInitValArr ::= ConstInitVal | ConstInitValArr "," ConstInitVal
+VarDecl         ::= INT VarDefArr ";"
+VarDefArr       ::= VarDefArr "," VarDef | VarDef
+VarDef          ::= IDENT | IDENT ConstExpMuti
+                  | IDENT "=" InitVal | IDENT ConstExpMuti "=" InitVal
+InitVal         ::= Exp | "{" "}" | "{" InitValArr "}"
+InitValArr      ::= InitVal | InitValArr "," InitVal
 
-FuncDef       ::= INT IDENT "(" ")" Block
-                | VOID IDENT "(" ")" Block
-                | INT IDENT "(" FuncFParamArr ")" Block
-                | VOID IDENT "(" FuncFParamArr ")" Block
-FuncFParamArr ::= FuncFParamArr "," FuncFParam | FuncFParam
-FuncFParam    ::= INT IDENT
+FuncDef         ::= INT IDENT "(" ")" Block
+                  | VOID IDENT "(" ")" Block
+                  | INT IDENT "(" FuncFParamArr ")" Block
+                  | VOID IDENT "(" FuncFParamArr ")" Block
+FuncFParamArr   ::= FuncFParamArr "," FuncFParam | FuncFParam
+FuncFParam      ::= INT IDENT
 
-Block         ::= "{" BlockItemArr "}"
-BlockItemArr  ::= BlockItemArr Decl | BlockItemArr Stmt | 
-Stmt          ::= LVal "=" Exp ";"
-                | ";"
-                | Exp ";"
-                | Block
-                | IF "(" Exp ")" Stmt
-                | IF "(" Exp ")" Stmt ELSE Stmt
-                | WHILE "(" Exp ")" Stmt
-                | BREAK ";"
-                | CONTINUE ";"
-                | RETURN ";"
-                | RETURN Exp ";"
+Block           ::= "{" BlockItemArr "}"
+BlockItemArr    ::= BlockItemArr Decl | BlockItemArr Stmt | 
+Stmt            ::= LVal "=" Exp ";"
+                  | ";"
+                  | Exp ";"
+                  | Block
+                  | IF "(" Exp ")" Stmt
+                  | IF "(" Exp ")" Stmt ELSE Stmt
+                  | WHILE "(" Exp ")" Stmt
+                  | BREAK ";"
+                  | CONTINUE ";"
+                  | RETURN ";"
+                  | RETURN Exp ";"
 
-Exp           ::= LOrExp
-LVal          ::= IDENT
-PrimaryExp    ::= "(" Exp ")" | LVal | Number
-Number        ::= INT_CONST
-UnaryExp      ::= PrimaryExp
-                | IDENT "(" ")"
-                | IDENT "(" FuncRParamArr ")"
-                | ("+" | "-" | "!") UnaryExp
-FuncRParamArr ::= FuncRParamArr "," FuncRParam | FuncRParam
-FuncRParam    ::= Exp
-MulExp        ::= UnaryExp | MulExp ("*" | "/" | "%") UnaryExp
-AddExp        ::= MulExp | AddExp ("+" | "-") MulExp
-RelExp        ::= AddExp | RelExp ("<" | ">" | "<=" | ">=") AddExp
-EqExp         ::= RelExp | EqExp ("==" | "!=") RelExp
-LAndExp       ::= EqExp | LAndExp "&&" EqExp
-LOrExp        ::= LAndExp | LOrExp "||" LAndExp
-ConstExp      ::= Exp
+Exp             ::= LOrExp
+LVal            ::= IDENT | IDENT ExpMuti
+PrimaryExp      ::= "(" Exp ")" | LVal | Number
+Number          ::= INT_CONST
+UnaryExp        ::= PrimaryExp
+                  | IDENT "(" ")"
+                  | IDENT "(" FuncRParamArr ")"
+                  | ("+" | "-" | "!") UnaryExp
+FuncRParamArr   ::= FuncRParamArr "," FuncRParam | FuncRParam
+FuncRParam      ::= Exp
+MulExp          ::= UnaryExp | MulExp ("*" | "/" | "%") UnaryExp
+AddExp          ::= MulExp | AddExp ("+" | "-") MulExp
+RelExp          ::= AddExp | RelExp ("<" | ">" | "<=" | ">=") AddExp
+EqExp           ::= RelExp | EqExp ("==" | "!=") RelExp
+LAndExp         ::= EqExp | LAndExp "&&" EqExp
+LOrExp          ::= LAndExp | LOrExp "||" LAndExp
+ConstExp        ::= Exp

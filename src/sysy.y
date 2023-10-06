@@ -50,7 +50,7 @@ using namespace std;
 %type <ast_val> LVal BlockItemArr ConstInitVal ConstExp
 %type <ast_val> VarDecl VarDefArr VarDef InitVal
 %type <ast_val> FuncFParamArr FuncFParam FuncRParamArr FuncRParam
-%type <ast_val> ConstExpArr ExpArr
+%type <ast_val> ConstInitValArr ConstExpMuti InitValArr ExpMuti
 %type <int_val> Number
 
 %%
@@ -143,7 +143,7 @@ ConstDefArr
   ;
 
 // ConstDef ::= IDENT "=" ConstInitVal
-//            | IDENT "[" ConstExp "]" "=" ConstInitVal
+//            | IDENT ConstExpMuti "=" ConstInitVal
 ConstDef
   : IDENT '=' ConstInitVal {
     auto ast = new ConstDefAST();
@@ -152,17 +152,34 @@ ConstDef
     ast->mode = 1;
     $$ = ast;
   }
-  | IDENT '[' ConstExp ']' '=' ConstInitVal {
+  | IDENT ConstExpMuti '=' ConstInitVal {
     auto ast = new ConstDefAST();
     ast->ident = *unique_ptr<string>($1);
-    ast->const_exp = unique_ptr<BaseAST>($3);
-    ast->const_init_val = unique_ptr<BaseAST>($6);
+    ast->const_exp_muti = unique_ptr<BaseAST>($2);
+    ast->const_init_val = unique_ptr<BaseAST>($4);
     ast->mode = 2;
     $$ = ast;
   }
   ;
 
-// ConstInitVal ::= ConstExp | "{" "}" | "{" ConstExpArr "}"
+// ConstExpMuti ::= "[" ConstExp "]" | ConstExpMuti "[" ConstExp "]";
+ConstExpMuti
+  : '[' ConstExp ']' {
+    auto ast = new ConstExpMutiAST();
+    ast->const_exp = unique_ptr<BaseAST>($2);
+    ast->mode = 1;
+    $$ = ast;
+  }
+  | ConstExpMuti '[' ConstExp ']' {
+    auto ast = new ConstExpMutiAST();
+    ast->const_exp_muti = unique_ptr<BaseAST>($1);
+    ast->const_exp = unique_ptr<BaseAST>($3);
+    ast->mode = 2;
+    $$ = ast;
+  }
+  ;
+
+// ConstInitVal ::= ConstExp | "{" "}" | "{" ConstInitValArr "}"
 ConstInitVal
   : ConstExp {
     auto ast = new ConstInitValAST();
@@ -175,26 +192,26 @@ ConstInitVal
     ast->mode = 2;
     $$ = ast;
   }
-  | '{' ConstExpArr '}' {
+  | '{' ConstInitValArr '}' {
     auto ast = new ConstInitValAST();
-    ast->const_exp_arr = unique_ptr<BaseAST>($2);
+    ast->const_init_val_arr = unique_ptr<BaseAST>($2);
     ast->mode = 3;
     $$ = ast;
   }
   ;
 
-// ConstExpArr ::= ConstExp | ConstExpArr "," ConstExp;
-ConstExpArr
-  : ConstExp {
-    auto ast = new ConstExpArrAST();
-    ast->const_exp = unique_ptr<BaseAST>($1);
+// ConstInitValArr ::= ConstInitVal | ConstInitValArr "," ConstInitVal
+ConstInitValArr
+  : ConstInitVal {
+    auto ast = new ConstInitValArrAST();
+    ast->const_init_val = unique_ptr<BaseAST>($1);
     ast->mode = 1;
     $$ = ast;
   }
-  | ConstExpArr ',' ConstExp {
-    auto ast = new ConstExpArrAST();
-    ast->const_exp_arr = unique_ptr<BaseAST>($1);
-    ast->const_exp = unique_ptr<BaseAST>($3);
+  | ConstInitValArr ',' ConstInitVal {
+    auto ast = new ConstInitValArrAST();
+    ast->const_init_val_arr = unique_ptr<BaseAST>($1);
+    ast->const_init_val = unique_ptr<BaseAST>($3);
     ast->mode = 2;
     $$ = ast;
   }
@@ -226,8 +243,8 @@ VarDefArr
   }
   ;
 
-// VarDef ::= IDENT | IDENT "[" ConstExp "]"
-//          | IDENT "=" InitVal | IDENT "[" ConstExp "]" "=" InitVal
+// VarDef ::= IDENT | IDENT ConstExpMuti
+//          | IDENT "=" InitVal | IDENT ConstExpMuti "=" InitVal;
 VarDef
   : IDENT {
     auto ast = new VarDefAST();
@@ -235,10 +252,10 @@ VarDef
     ast->mode = 1;
     $$ = ast;
   }
-  | IDENT '[' ConstExp ']' {
+  | IDENT ConstExpMuti {
     auto ast = new VarDefAST();
     ast->ident = *unique_ptr<string>($1);
-    ast->const_exp = unique_ptr<BaseAST>($3);
+    ast->const_exp_muti = unique_ptr<BaseAST>($2);
     ast->mode = 2;
     $$ = ast;
   }
@@ -249,17 +266,17 @@ VarDef
     ast->mode = 3;
     $$ = ast;
   }
-  | IDENT '[' ConstExp ']' '=' InitVal {
+  | IDENT ConstExpMuti '=' InitVal {
     auto ast = new VarDefAST();
     ast->ident = *unique_ptr<string>($1);
-    ast->const_exp = unique_ptr<BaseAST>($3);
-    ast->init_val = unique_ptr<BaseAST>($6);
+    ast->const_exp_muti = unique_ptr<BaseAST>($2);
+    ast->init_val = unique_ptr<BaseAST>($4);
     ast->mode = 4;
     $$ = ast;
   }
   ;
 
-// InitVal ::= Exp | "{" "}" | "{" ExpArr "}"
+// InitVal ::= Exp | "{" "}" | "{" InitValArr "}"
 InitVal
   : Exp {
     auto ast = new InitValAST();
@@ -272,26 +289,26 @@ InitVal
     ast->mode = 2;
     $$ = ast;
   }
-  | '{' ExpArr '}' {
+  | '{' InitValArr '}' {
     auto ast = new InitValAST();
-    ast->exp_arr = unique_ptr<BaseAST>($2);
+    ast->init_val_arr = unique_ptr<BaseAST>($2);
     ast->mode = 3;
     $$ = ast;
   }
   ;
 
-// ExpArr ::= Exp | ExpArr "," Exp
-ExpArr
-  : Exp {
-    auto ast = new ExpArrAST();
-    ast->exp = unique_ptr<BaseAST>($1);
+// InitValArr ::= InitVal | InitValArr "," InitVal
+InitValArr
+  : InitVal {
+    auto ast = new InitValArrAST();
+    ast->init_val = unique_ptr<BaseAST>($1);
     ast->mode = 1;
     $$ = ast;
   }
-  | ExpArr ',' Exp {
-    auto ast = new ExpArrAST();
-    ast->exp_arr = unique_ptr<BaseAST>($1);
-    ast->exp = unique_ptr<BaseAST>($3);
+  | InitValArr ',' InitVal {
+    auto ast = new InitValArrAST();
+    ast->init_val_arr = unique_ptr<BaseAST>($1);
+    ast->init_val = unique_ptr<BaseAST>($3);
     ast->mode = 2;
     $$ = ast;
   }
@@ -493,7 +510,7 @@ Exp
   }
   ;
 
-// LVal ::= IDENT | IDENT "[" Exp "]"
+// LVal ::= IDENT | IDENT ExpMuti;
 LVal
   : IDENT {
     auto ast = new LValAST();
@@ -501,9 +518,26 @@ LVal
     ast->mode = 1;
     $$ = ast;
   }
-  | IDENT '[' Exp ']' {
+  | IDENT ExpMuti {
     auto ast = new LValAST();
     ast->ident = *unique_ptr<string>($1);
+    ast->exp_muti = unique_ptr<BaseAST>($2);
+    ast->mode = 2;
+    $$ = ast;
+  }
+  ;
+
+// ExpMuti ::= "[" Exp "]" | ExpMuti "[" Exp "]";
+ExpMuti
+  : '[' Exp ']' {
+    auto ast = new ExpMutiAST();
+    ast->exp = unique_ptr<BaseAST>($2);
+    ast->mode = 1;
+    $$ = ast;
+  }
+  | ExpMuti '[' Exp ']' {
+    auto ast = new ExpMutiAST();
+    ast->exp_muti = unique_ptr<BaseAST>($1);
     ast->exp = unique_ptr<BaseAST>($3);
     ast->mode = 2;
     $$ = ast;

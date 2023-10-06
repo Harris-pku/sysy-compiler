@@ -135,11 +135,11 @@ class ConstDefArrAST : public BaseAST {
 };
 
 // ConstDef ::= IDENT "=" ConstInitVal
-//            | IDENT "[" ConstExp "]" "=" ConstInitVal
+//            | IDENT ConstExpMuti "=" ConstInitVal
 class ConstDefAST : public BaseAST {
   public:
     std::unique_ptr<BaseAST> const_init_val;
-    std::unique_ptr<BaseAST> const_exp;
+    std::unique_ptr<BaseAST> const_exp_muti;
     std::string ident;
     int mode;
 
@@ -149,6 +149,7 @@ class ConstDefAST : public BaseAST {
               std::stack<num_t>* val_st, int global,
               std::map<std::string, sym_t>* val_ma) const override {
       sym_t sym;
+      int value;
       switch (mode){
         case 1:
           sym.val_t = const_init_val->Cal(str, val_st, val_ma);
@@ -156,6 +157,11 @@ class ConstDefAST : public BaseAST {
           (*val_ma)[ident] = sym;
           break;
         case 2:
+          value = const_exp_muti->Cal(str, val_st, val_ma);
+          sym.val_t = 0;
+          sym.type = 6;
+          sym.number = value;
+          (*val_ma)[ident] = sym;
           break;
         default:
           assert(false);
@@ -164,11 +170,37 @@ class ConstDefAST : public BaseAST {
     }
 };
 
-// ConstInitVal ::= ConstExp | "{" "}" | "{" ConstExpArr "}"
+// ConstExpMuti ::= "[" ConstExp "]" | ConstExpMuti "[" ConstExp "]";
+class ConstExpMutiAST : public BaseAST {
+  public:
+    std::unique_ptr<BaseAST> const_exp;
+    std::unique_ptr<BaseAST> const_exp_muti;
+    int mode;
+
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override { return 0; }
+
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
+              std::map<std::string, sym_t>* val_ma) const override {
+      switch (mode){
+        case 1:
+          const_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          break;
+        case 2:
+          const_exp_muti->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          const_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          break;
+        default:
+          assert(false);
+      }
+    }
+};
+
+// ConstInitVal ::= ConstExp | "{" "}" | "{" ConstInitValArr "}"
 class ConstInitValAST : public BaseAST {
   public:
     std::unique_ptr<BaseAST> const_exp;
-    std::unique_ptr<BaseAST> const_exp_arr;
+    std::unique_ptr<BaseAST> const_init_val_arr;
     int mode;
 
     int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override {
@@ -206,11 +238,11 @@ class ConstInitValAST : public BaseAST {
     }
 };
 
-// ConstExpArr ::= ConstExp | ConstExpArr "," ConstExp
-class ConstExpArrAST : public BaseAST {
+// ConstInitValArr ::= ConstInitVal | ConstInitValArr "," ConstInitVal
+class ConstInitValArrAST : public BaseAST {
   public:
-    std::unique_ptr<BaseAST> const_exp;
-    std::unique_ptr<BaseAST> const_exp_arr;
+    std::unique_ptr<BaseAST> const_init_val;
+    std::unique_ptr<BaseAST> const_init_val_arr;
     int mode;
 
     int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override { return 0; }
@@ -220,11 +252,11 @@ class ConstExpArrAST : public BaseAST {
               std::map<std::string, sym_t>* val_ma) const override {
       switch (mode){
         case 1:
-          const_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          const_init_val->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           break;
         case 2:
-          const_exp_arr->Dump(str, cnt, loop_cur, val_st, global, val_ma);
-          const_exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          const_init_val_arr->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          const_init_val->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           break;
         default:
           assert(false);
@@ -273,12 +305,12 @@ class VarDefArrAST : public BaseAST {
     }
 };
 
-// VarDef ::= IDENT | IDENT "[" ConstExp "]"
-//          | IDENT "=" InitVal | IDENT "[" ConstExp "]" "=" InitVal
+// VarDef ::= IDENT | IDENT ConstExpMuti
+//          | IDENT "=" InitVal | IDENT ConstExpMuti "=" InitVal
 class VarDefAST : public BaseAST {
   public:
     std::unique_ptr<BaseAST> init_val;
-    std::unique_ptr<BaseAST> const_exp;
+    std::unique_ptr<BaseAST> const_exp_muti;
     std::string ident;
     int mode;
 
@@ -347,11 +379,11 @@ class VarDefAST : public BaseAST {
     }
 };
 
-// InitVal ::= Exp | "{" "}" | "{" ExpArr "}"
+// InitVal ::= Exp | "{" "}" | "{" InitValArr "}"
 class InitValAST : public BaseAST {
   public:
     std::unique_ptr<BaseAST> exp;
-    std::unique_ptr<BaseAST> exp_arr;
+    std::unique_ptr<BaseAST> init_val_arr;
     int mode;
 
     int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override {
@@ -366,6 +398,7 @@ class InitValAST : public BaseAST {
           break;
         default:
           assert(false);
+          break;
       }
       return val;
     }
@@ -380,7 +413,7 @@ class InitValAST : public BaseAST {
         case 2:
           break;
         case 3:
-          exp_arr->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          init_val_arr->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           break;
         default:
           assert(false);
@@ -389,11 +422,11 @@ class InitValAST : public BaseAST {
     }
 };
 
-// ExpArr ::= Exp | ExpArr "," Exp
-class ExpArrAST : public BaseAST {
+// InitValArr ::= InitVal | InitValArr "," InitVal
+class InitValArrAST : public BaseAST {
   public:
-    std::unique_ptr<BaseAST> exp;
-    std::unique_ptr<BaseAST> exp_arr;
+    std::unique_ptr<BaseAST> init_val;
+    std::unique_ptr<BaseAST> init_val_arr;
     int mode;
 
     int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override { return 0; }
@@ -403,14 +436,15 @@ class ExpArrAST : public BaseAST {
               std::map<std::string, sym_t>* val_ma) const override {
       switch (mode){
         case 1:
-          exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          init_val->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           break;
         case 2:
-          exp_arr->Dump(str, cnt, loop_cur, val_st, global, val_ma);
-          exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          init_val_arr->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          init_val->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           break;
         default:
           assert(false);
+          break;
       }
     }
 };
@@ -856,11 +890,11 @@ class ExpAST : public BaseAST {
     }
 };
 
-// LVal ::= IDENT | IDENT "[" Exp "]"
+// LVal ::= IDENT | IDENT ExpMuti
 class LValAST : public BaseAST {
   public:
     std::string ident;
-    std::unique_ptr<BaseAST> exp;
+    std::unique_ptr<BaseAST> exp_muti;
     int mode;
 
     int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override {
@@ -883,7 +917,7 @@ class LValAST : public BaseAST {
     void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
               std::stack<num_t>* val_st, int global,
               std::map<std::string, sym_t>* val_ma) const override {
-      char stmp[20];
+      char stmp[50];
       num_t tmpnum;
       switch (mode){
         case 1:
@@ -913,6 +947,33 @@ class LValAST : public BaseAST {
           }
           break;
         case 2:
+          break;
+        default:
+          assert(false);
+          break;
+      }
+    }
+};
+
+// ExpMuti ::= "[" Exp "]" | ExpMuti "[" Exp "]";
+class ExpMutiAST : public BaseAST {
+  public:
+    std::unique_ptr<BaseAST> exp;
+    std::unique_ptr<BaseAST> exp_muti;
+    int mode;
+
+    int Cal(char *str, std::stack<num_t>* val_st, std::map<std::string, sym_t>* val_ma) override { return 0; }
+
+    void Dump(char *str, int & cnt, std::stack<int>* loop_cur,
+              std::stack<num_t>* val_st, int global,
+              std::map<std::string, sym_t>* val_ma) const override {
+      switch (mode){
+        case 1:
+          exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          break;
+        case 2:
+          exp_muti->Dump(str, cnt, loop_cur, val_st, global, val_ma);
+          exp->Dump(str, cnt, loop_cur, val_st, global, val_ma);
           break;
         default:
           assert(false);
